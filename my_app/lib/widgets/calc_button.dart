@@ -10,7 +10,9 @@ class CalcButton extends StatelessWidget {
   final Color? subTextColorRight;
   final VoidCallback onPressed;
   final double fontSize;
-  final bool isLarge;
+  final double subFontSize;
+  final Widget? icon;
+  final bool isWide;
 
   const CalcButton({
     super.key,
@@ -18,39 +20,52 @@ class CalcButton extends StatelessWidget {
     required this.onPressed,
     this.subLabelTop,
     this.subLabelRight,
-    this.backgroundColor = const Color(0xFF3F444D),
+    this.backgroundColor = const Color(0xFF31363D),
     this.textColor = Colors.white,
-    this.subTextColorTop = const Color(0xFFB5C99A),
-    this.subTextColorRight = const Color(0xFFFFB6C1),
-    this.fontSize = 18,
-    this.isLarge = false,
+    this.subTextColorTop = const Color(0xFFA5B495),
+    this.subTextColorRight = const Color(0xFFD18A90),
+    this.fontSize = 15,
+    this.subFontSize = 8,
+    this.icon,
+    this.isWide = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
+      flex: isWide ? 1 : 1,
       child: Padding(
-        padding: const EdgeInsets.all(2.0),
+        padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 1.5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  subLabelTop ?? '',
-                  style: TextStyle(color: subTextColorTop, fontSize: 10),
-                ),
-                Text(
-                  subLabelRight ?? '',
-                  style: TextStyle(color: subTextColorRight, fontSize: 10),
-                ),
-              ],
-            ),
-            const SizedBox(height: 2),
             SizedBox(
-              width: double.infinity,
-              height: isLarge ? 50 : 40,
+              height: 12,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    subLabelTop ?? '',
+                    style: TextStyle(
+                      color: subTextColorTop,
+                      fontSize: subFontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    subLabelRight ?? '',
+                    style: TextStyle(
+                      color: subTextColorRight,
+                      fontSize: subFontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 1),
+            SizedBox(
+              height: 36,
               child: ElevatedButton(
                 onPressed: onPressed,
                 style: ElevatedButton.styleFrom(
@@ -58,15 +73,16 @@ class CalcButton extends StatelessWidget {
                   foregroundColor: textColor,
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 2,
+                  shadowColor: Colors.black,
                 ),
-                child: Text(
+                child: icon ?? Text(
                   label,
                   style: TextStyle(
                     fontSize: fontSize,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),

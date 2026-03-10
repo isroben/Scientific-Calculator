@@ -44,7 +44,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       } else if (label == 'Ans') {
         _expression += _result;
       } else {
-        // Simple mapping for display vs logic
         String toAdd = label;
         if (label == '×') toAdd = '*';
         if (label == '÷') toAdd = '/';
@@ -61,76 +60,171 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Display Area
-            Expanded(
-              flex: 3,
+            // 1. Display Area (Redesigned for Pixel-Perfect match)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10),
               child: Container(
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.all(12),
+                height: MediaQuery.of(context).size.height * 0.28,
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: AppColors.displayBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.black, width: 2),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                child: Stack(
                   children: [
-                    const Align(
-                      alignment: Alignment.topLeft,
-                      child: Icon(Icons.camera_alt_outlined, size: 24),
+                    const Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Icon(Icons.camera_alt_outlined, size: 24, color: AppColors.textDark),
                     ),
-                    const Spacer(),
-                    Text(
-                      _expression,
-                      style: const TextStyle(fontSize: 24, color: Colors.black, fontFamily: 'monospace'),
+                    Positioned(
+                      bottom: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.textDark, width: 1.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Icon(Icons.camera_enhance_outlined, size: 18, color: AppColors.textDark),
+                      ),
                     ),
-                    Text(
-                      _result.isNotEmpty ? '= $_result' : '',
-                      style: const TextStyle(fontSize: 20, color: Colors.black54, fontWeight: FontWeight.bold),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 25, right: 15),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _expression.isEmpty ? '0' : _expression,
+                              style: const TextStyle(
+                                fontSize: 36,
+                                color: AppColors.textDark,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              width: 3,
+                              height: 34,
+                              color: AppColors.displayCursor,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
 
-            // Toolbar (Skipping options, settings, go pro as requested)
+            // 2. Toolbar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4),
               child: Row(
                 children: [
-                  const Icon(Icons.menu, color: Colors.transparent), // Placeholder for menu
+                  const Icon(Icons.menu, color: Colors.white, size: 30),
+                  const SizedBox(width: 12),
+                  _buildGoProButton(),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.settings_outlined, color: Colors.white, size: 26),
+                  const SizedBox(width: 10),
+                  const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  const Text('Σ', style: TextStyle(color: Colors.white)),
-                  const SizedBox(width: 8),
-                  const Text('RAD', style: TextStyle(color: Colors.white)),
-                  const SizedBox(width: 8),
-                  const Text('MATH', style: TextStyle(color: Colors.white)),
-                  const SizedBox(width: 8),
-                  const Text('DECI', style: TextStyle(color: Colors.white)),
+                  _buildToolbarTag('RAD'),
+                  _buildToolbarTag('MATH'),
+                  _buildToolbarTag('DECI'),
                 ],
               ),
             ),
 
-            // Buttons Area
+            const SizedBox(height: 8),
+
+            // 3. Button Grid (Matching the reference layout)
             Expanded(
-              flex: 7,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildRow(['SHIFT', 'ALPHA', '◀', '▶', 'MODE', '≫']),
-                      _buildRow(['OPTN', 'CALC', '▲', '▼', '∫dx', 'x']),
-                      _buildRow(['□/□', '√', 'x²', 'xᐞ', 'Log', 'Ln']),
-                      _buildRow(['(-)', '°\'\"', 'hyp', 'Sin', 'Cos', 'Tan']),
-                      _buildRow(['STO', 'ENG', '(', ')', 'S⇔D', 'M+']),
-                      const SizedBox(height: 8),
-                      _buildRow(['7', '8', '9', '⌫', 'CLR'], isNumeric: true),
-                      _buildRow(['4', '5', '6', '×', '÷'], isNumeric: true),
-                      _buildRow(['1', '2', '3', '+', '-'], isNumeric: true),
-                      _buildRow(['0', '.', 'Exp', 'Ans', '='], isNumeric: true),
-                    ],
-                  ),
+                child: Column(
+                  children: [
+                    _row([
+                      _btn('SHIFT', bg: AppColors.shiftGreen, tx: Colors.black),
+                      _btn('ALPHA', bg: AppColors.alphaBlue, tx: Colors.black),
+                      _btn('', icon: const Icon(Icons.arrow_left, color: Colors.white, size: 28)),
+                      _btn('', icon: const Icon(Icons.arrow_right, color: Colors.white, size: 28)),
+                      _btn('MODE'),
+                      _btn('≫'),
+                    ]),
+                    _row([
+                      _btn('OPTN', st: 'SOLVE', sr: '='),
+                      _btn('CALC', st: 'd/dx', sr: ':'),
+                      _btn('▲'),
+                      _btn('▼'),
+                      _btn('∫dx', st: 'Σ', sr: 'Π'),
+                      _btn('x', sr: ':'),
+                    ]),
+                    _row([
+                      _btn('□/□', st: '÷R'),
+                      _btn('√', st: '∛', sr: 'mod'),
+                      _btn('x²', st: 'x³', sr: '■'),
+                      _btn('xᐞ', st: '√', sr: 'Cot'),
+                      _btn('Log', st: '10ᐞ', sr: 'Cot⁻¹'),
+                      _btn('Ln', st: 'eᐞ', sr: 't'),
+                    ]),
+                    _row([
+                      _btn('(-)', st: 'Logₐ', sr: 'a'),
+                      _btn('°\'\"', st: 'FACT', sr: 'b'),
+                      _btn('hyp', st: '■!', sr: 'c'),
+                      _btn('Sin', st: 'Sin⁻¹', sr: 'd'),
+                      _btn('Cos', st: 'Cos⁻¹', sr: 'e'),
+                      _btn('Tan', st: 'Tan⁻¹', sr: 'f'),
+                    ]),
+                    _row([
+                      _btn('STO', st: 'RCL', sr: 'CRL'),
+                      _btn('ENG', st: '∠', sr: 'i'),
+                      _btn('(', sr: 'x'),
+                      _btn(')', sr: 'y'),
+                      _btn('S⇔D', sr: 'z'),
+                      _btn('M+', st: 'M-', sr: 'm'),
+                    ]),
+                    const SizedBox(height: 4),
+                    _row([
+                      _btn('7', bg: AppColors.buttonGrey, st: 'CONST'),
+                      _btn('8', bg: AppColors.buttonGrey, st: 'CONV'),
+                      _btn('9', bg: AppColors.buttonGrey, st: 'SI'),
+                      _btn('⌫', bg: const Color(0xFF60646B), icon: const Icon(Icons.backspace_outlined, size: 20)),
+                      _btn('CLR', bg: const Color(0xFF60646B), st: 'CLR All'),
+                    ]),
+                    _row([
+                      _btn('4', bg: AppColors.buttonGrey, st: 'MATRIX', sr: '::'),
+                      _btn('5', bg: AppColors.buttonGrey, st: 'VECTOR'),
+                      _btn('6', bg: AppColors.buttonGrey, st: 'FUNC', sr: 'HELP'),
+                      _btn('×', bg: AppColors.buttonWhite, tx: Colors.black, st: 'nPr', sr: 'GCD'),
+                      _btn('÷', bg: AppColors.buttonWhite, tx: Colors.black, st: 'nCr', sr: 'LCM'),
+                    ]),
+                    _row([
+                      _btn('1', bg: AppColors.buttonGrey, st: 'STAT'),
+                      _btn('2', bg: AppColors.buttonGrey, st: 'CMPLX'),
+                      _btn('3', bg: AppColors.buttonGrey, st: 'DISTR'),
+                      _btn('+', bg: AppColors.buttonWhite, tx: Colors.black, st: 'Pol', sr: 'Ceil'),
+                      _btn('-', bg: AppColors.buttonWhite, tx: Colors.black, st: 'Rec', sr: 'Floor'),
+                    ]),
+                    _row([
+                      _btn('0', bg: AppColors.buttonGrey, st: 'Copy', sr: 'Paste'),
+                      _btn('.', bg: AppColors.buttonGrey, st: 'Ran#', sr: 'RanInt'),
+                      _btn('Exp', bg: AppColors.buttonGrey, st: 'π', sr: 'e'),
+                      _btn('Ans', bg: AppColors.buttonWhite, tx: Colors.black, st: '%', sr: 'PreAns'),
+                      _btn('=', bg: AppColors.buttonWhite, tx: Colors.black, st: 'History'),
+                    ]),
+                  ],
                 ),
               ),
             ),
@@ -140,34 +234,41 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
-  Widget _buildRow(List<String> labels, {bool isNumeric = false}) {
-    return Row(
-      children: labels.map((label) {
-        Color bgColor = AppColors.functionButton;
-        Color textColor = Colors.white;
-        
-        if (label == 'SHIFT') {
-          bgColor = AppColors.shiftButton;
-          textColor = Colors.black;
-        } else if (label == 'ALPHA') {
-          bgColor = AppColors.alphaButton;
-          textColor = Colors.black;
-        } else if (RegExp(r'^[0-9.]$').hasMatch(label) || label == 'Exp') {
-          bgColor = AppColors.numberButton;
-        } else if (['+', '-', '×', '÷', '=', 'Ans'].contains(label)) {
-          bgColor = Colors.white;
-          textColor = Colors.black;
-        } else if (['⌫', 'CLR'].contains(label)) {
-          bgColor = const Color(0xFF60646B);
-        }
+  Widget _buildGoProButton() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.goProBlue,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Text('GO PRO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+    );
+  }
 
-        return CalcButton(
-          label: label,
-          backgroundColor: bgColor,
-          textColor: textColor,
-          onPressed: () => _onButtonPressed(label),
-        );
-      }).toList(),
+  Widget _buildToolbarTag(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 10),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w400)),
+    );
+  }
+
+  Widget _row(List<Widget> buttons) {
+    return Expanded(
+      child: Row(
+        children: buttons,
+      ),
+    );
+  }
+
+  Widget _btn(String label, {Color? bg, Color? tx, String? st, String? sr, Widget? icon}) {
+    return CalcButton(
+      label: label,
+      onPressed: () => _onButtonPressed(label),
+      backgroundColor: bg ?? AppColors.buttonDark,
+      textColor: tx ?? Colors.white,
+      subLabelTop: st,
+      subLabelRight: sr,
+      icon: icon,
     );
   }
 }
