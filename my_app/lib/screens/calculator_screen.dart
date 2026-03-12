@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../constants/calc_colors.dart';
 import '../widgets/calc_button.dart';
-import '../constants/colors.dart';
-import '../services/calculator_service.dart';
+import '../data/keypad_layout.dart';
+import '../models/calc_key.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -11,219 +12,171 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  String _expression = '';
-  String _result = '';
-  late CalculatorService _calcService;
+  String expression = "";
 
-  @override
-  void initState() {
-    super.initState();
-    try {
-      _calcService = CalculatorService();
-    } catch (e) {
-      debugPrint('FFI Initialization failed: $e');
-    }
-  }
-
-  void _onButtonPressed(String label) {
+  void _onPressed(String label) {
     setState(() {
       if (label == 'CLR') {
-        _expression = '';
-        _result = '';
+        expression = "";
       } else if (label == '⌫') {
-        if (_expression.isNotEmpty) {
-          _expression = _expression.substring(0, _expression.length - 1);
+        if (expression.isNotEmpty) {
+          expression = expression.substring(0, expression.length - 1);
         }
-      } else if (label == '=') {
-        try {
-          final evalResult = _calcService.evaluate(_expression);
-          _result = evalResult.toString();
-        } catch (e) {
-          _result = 'Error';
-        }
-      } else if (label == 'Ans') {
-        _expression += _result;
       } else {
-        String toAdd = label;
-        if (label == '×') toAdd = '*';
-        if (label == '÷') toAdd = '/';
-        if (label == 'Exp') toAdd = 'e';
-        _expression += toAdd;
+        expression += label;
       }
     });
+  }
+
+  Widget _buildKeyRow(List<CalcKey> keys, {required bool isDense}) {
+    return Expanded(
+      flex: isDense ? 8 : 9,
+      child: Row(
+        children: keys.map((key) {
+          return CalcButton(
+            label: key.label,
+            top: key.top,
+            right: key.right,
+            color: key.color,
+            textColor: key.textColor,
+            onTap: () => _onPressed(key.label),
+            fontSize: isDense ? 20 : 28,
+            fontWeight: isDense ? FontWeight.normal : FontWeight.bold,
+            verticalPadding: isDense ? 0.2 : 1.0,
+            horizontalPadding: 3.5,
+            subFontSize: 16,
+          );
+        }).toList(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: CalcColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Display Area (Redesigned for Pixel-Perfect match)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10),
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.28,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.displayBackground,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    const Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Icon(Icons.camera_alt_outlined, size: 24, color: AppColors.textDark),
-                    ),
-                    Positioned(
-                      bottom: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.textDark, width: 1.5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Icon(Icons.camera_enhance_outlined, size: 18, color: AppColors.textDark),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 25, right: 15),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _expression.isEmpty ? '0' : _expression,
-                              style: const TextStyle(
-                                fontSize: 36,
-                                color: AppColors.textDark,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Container(
-                              width: 3,
-                              height: 34,
-                              color: AppColors.displayCursor,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+            // 1. TOP AD BANNER
+            Container(
+              height: 50,
+              width: double.infinity,
+              color: Colors.black,
+              alignment: Alignment.center,
+              child: Text(
+                "AD BANNER SPACE",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
                 ),
               ),
             ),
 
-            // 2. Toolbar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4),
-              child: Row(
-                children: [
-                  const Icon(Icons.menu, color: Colors.white, size: 30),
-                  const SizedBox(width: 12),
-                  _buildGoProButton(),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.settings_outlined, color: Colors.white, size: 26),
-                  const SizedBox(width: 10),
-                  const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  _buildToolbarTag('RAD'),
-                  _buildToolbarTag('MATH'),
-                  _buildToolbarTag('DECI'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // 3. Button Grid (Matching the reference layout)
+            // 2. DISPLAY AREA
             Expanded(
+              flex: 5,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: CalcColors.display,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: Icon(Icons.camera_alt_outlined, size: 22, color: CalcColors.textDark),
+                      ),
+                      Positioned(
+                        bottom: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: CalcColors.textDark, width: 1.5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(Icons.crop_free, size: 16, color: CalcColors.textDark),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 10, right: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                expression.isEmpty ? '0' : expression,
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  color: CalcColors.textDark,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(width: 2.5, height: 32, color: CalcColors.cursor),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. TOOLBAR
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: SizedBox(
+                height: 36,
+                child: Row(
+                  children: [
+                    const Icon(Icons.menu, color: Colors.white, size: 28),
+                    const SizedBox(width: 10),
+                    _buildGoProButton(),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                    const SizedBox(width: 16),
+                    const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold)),
+                    // const Spacer(),
+                    const SizedBox(width: 16),
+                    const Text('RAD', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const SizedBox(width: 16),
+                    const Text('MATH', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const SizedBox(width: 16),
+                    const Text('DECI', style: TextStyle(color: Colors.white, fontSize: 18)),
+                  ],
+                ),
+              ),
+            ),
+
+            // 4. KEYPAD
+            Expanded(
+              flex: 13,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4.0, right: 4.0, top: 0.0),
                 child: Column(
                   children: [
-                    _row([
-                      _btn('SHIFT', bg: AppColors.shiftGreen, tx: Colors.black),
-                      _btn('ALPHA', bg: AppColors.alphaBlue, tx: Colors.black),
-                      _btn('', icon: const Icon(Icons.arrow_left, color: Colors.white, size: 28)),
-                      _btn('', icon: const Icon(Icons.arrow_right, color: Colors.white, size: 28)),
-                      _btn('MODE'),
-                      _btn('≫'),
-                    ]),
-                    _row([
-                      _btn('OPTN', st: 'SOLVE', sr: '='),
-                      _btn('CALC', st: 'd/dx', sr: ':'),
-                      _btn('▲'),
-                      _btn('▼'),
-                      _btn('∫dx', st: 'Σ', sr: 'Π'),
-                      _btn('x', sr: ':'),
-                    ]),
-                    _row([
-                      _btn('□/□', st: '÷R'),
-                      _btn('√', st: '∛', sr: 'mod'),
-                      _btn('x²', st: 'x³', sr: '■'),
-                      _btn('xᐞ', st: '√', sr: 'Cot'),
-                      _btn('Log', st: '10ᐞ', sr: 'Cot⁻¹'),
-                      _btn('Ln', st: 'eᐞ', sr: 't'),
-                    ]),
-                    _row([
-                      _btn('(-)', st: 'Logₐ', sr: 'a'),
-                      _btn('°\'\"', st: 'FACT', sr: 'b'),
-                      _btn('hyp', st: '■!', sr: 'c'),
-                      _btn('Sin', st: 'Sin⁻¹', sr: 'd'),
-                      _btn('Cos', st: 'Cos⁻¹', sr: 'e'),
-                      _btn('Tan', st: 'Tan⁻¹', sr: 'f'),
-                    ]),
-                    _row([
-                      _btn('STO', st: 'RCL', sr: 'CRL'),
-                      _btn('ENG', st: '∠', sr: 'i'),
-                      _btn('(', sr: 'x'),
-                      _btn(')', sr: 'y'),
-                      _btn('S⇔D', sr: 'z'),
-                      _btn('M+', st: 'M-', sr: 'm'),
-                    ]),
+                    // Scientific rows
+                    _buildKeyRow(scientificKeys.sublist(0, 6), isDense: true),
+                    _buildKeyRow(scientificKeys.sublist(6, 12), isDense: true),
+                    _buildKeyRow(scientificKeys.sublist(12, 18), isDense: true),
+                    _buildKeyRow(scientificKeys.sublist(18, 24), isDense: true),
+                    _buildKeyRow(scientificKeys.sublist(24, 30), isDense: true),
+
                     const SizedBox(height: 4),
-                    _row([
-                      _btn('7', bg: AppColors.buttonGrey, st: 'CONST'),
-                      _btn('8', bg: AppColors.buttonGrey, st: 'CONV'),
-                      _btn('9', bg: AppColors.buttonGrey, st: 'SI'),
-                      _btn('⌫', bg: const Color(0xFF60646B), icon: const Icon(Icons.backspace_outlined, size: 20)),
-                      _btn('CLR', bg: const Color(0xFF60646B), st: 'CLR All'),
-                    ]),
-                    _row([
-                      _btn('4', bg: AppColors.buttonGrey, st: 'MATRIX', sr: '::'),
-                      _btn('5', bg: AppColors.buttonGrey, st: 'VECTOR'),
-                      _btn('6', bg: AppColors.buttonGrey, st: 'FUNC', sr: 'HELP'),
-                      _btn('×', bg: AppColors.buttonWhite, tx: Colors.black, st: 'nPr', sr: 'GCD'),
-                      _btn('÷', bg: AppColors.buttonWhite, tx: Colors.black, st: 'nCr', sr: 'LCM'),
-                    ]),
-                    _row([
-                      _btn('1', bg: AppColors.buttonGrey, st: 'STAT'),
-                      _btn('2', bg: AppColors.buttonGrey, st: 'CMPLX'),
-                      _btn('3', bg: AppColors.buttonGrey, st: 'DISTR'),
-                      _btn('+', bg: AppColors.buttonWhite, tx: Colors.black, st: 'Pol', sr: 'Ceil'),
-                      _btn('-', bg: AppColors.buttonWhite, tx: Colors.black, st: 'Rec', sr: 'Floor'),
-                    ]),
-                    _row([
-                      _btn('0', bg: AppColors.buttonGrey, st: 'Copy', sr: 'Paste'),
-                      _btn('.', bg: AppColors.buttonGrey, st: 'Ran#', sr: 'RanInt'),
-                      _btn('Exp', bg: AppColors.buttonGrey, st: 'π', sr: 'e'),
-                      _btn('Ans', bg: AppColors.buttonWhite, tx: Colors.black, st: '%', sr: 'PreAns'),
-                      _btn('=', bg: AppColors.buttonWhite, tx: Colors.black, st: 'History'),
-                    ]),
+
+                    // Numeric rows
+                    _buildKeyRow(numericKeys.sublist(0, 5), isDense: false),
+                    _buildKeyRow(numericKeys.sublist(5, 10), isDense: false),
+                    _buildKeyRow(numericKeys.sublist(10, 15), isDense: false),
+                    _buildKeyRow(numericKeys.sublist(15, 20), isDense: false),
                   ],
                 ),
               ),
@@ -236,39 +189,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Widget _buildGoProButton() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.goProBlue,
-        borderRadius: BorderRadius.circular(18),
+        color: CalcColors.goPro,
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: const Text('GO PRO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
-    );
-  }
-
-  Widget _buildToolbarTag(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 10),
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w400)),
-    );
-  }
-
-  Widget _row(List<Widget> buttons) {
-    return Expanded(
-      child: Row(
-        children: buttons,
+      child: const Text(
+        'GO PRO',
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
       ),
-    );
-  }
-
-  Widget _btn(String label, {Color? bg, Color? tx, String? st, String? sr, Widget? icon}) {
-    return CalcButton(
-      label: label,
-      onPressed: () => _onButtonPressed(label),
-      backgroundColor: bg ?? AppColors.buttonDark,
-      textColor: tx ?? Colors.white,
-      subLabelTop: st,
-      subLabelRight: sr,
-      icon: icon,
     );
   }
 }

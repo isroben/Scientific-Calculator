@@ -2,22 +2,17 @@ import 'package:flutter/material.dart';
 import 'screens/calculator_screen.dart';
 
 void main() {
-  runApp(const ScientificCalculatorApp());
+  runApp(const CalculatorApp());
 }
 
-class ScientificCalculatorApp extends StatelessWidget {
-  const ScientificCalculatorApp({super.key});
+class CalculatorApp extends StatelessWidget {
+  const CalculatorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Scientific Calculator',
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      home: const CalculatorScreen(),
+      home: CalculatorScreen(),
     );
   }
 }
