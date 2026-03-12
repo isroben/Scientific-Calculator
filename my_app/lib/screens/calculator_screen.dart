@@ -12,14 +12,32 @@ class CalculatorScreen extends StatefulWidget {
   State<CalculatorScreen> createState() => _CalculatorScreenState();
 }
 
+class Calculation {
+  final String expression;
+  final String result;
+  Calculation(this.expression, this.result);
+}
+
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  String expression = "";
-  String result = "";
+  final List<Calculation> _history = [];
+  String _currentExpression = "";
+  String _currentResult = "";
+  final ScrollController _scrollController = ScrollController();
 
   final CalculatorService _service = CalculatorService();
 
-  /// Formats a decimal result by grouping digits after the decimal point
-  /// in blocks of three, separated by spaces.
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   String _formatResult(String raw) {
     if (raw.isEmpty || raw == 'Error') return raw;
     if (!raw.contains('.')) return raw;
@@ -36,36 +54,48 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return '$intPart.${buffer.toString()}';
   }
 
+  bool _isOperator(String label) {
+    return ['+', '-', '×', '÷', '^', 'mod'].contains(label);
+  }
+
   void _onPressed(String label) {
     setState(() {
       if (label == 'CLR' || label == 'AC') {
-        expression = "";
-        result = "";
+        _currentExpression = "";
+        _currentResult = "";
+        _history.clear();
       } else if (label == '⌫') {
-        if (expression.isNotEmpty) {
-          expression = expression.substring(0, expression.length - 1);
+        if (_currentExpression.isNotEmpty) {
+          _currentExpression = _currentExpression.substring(0, _currentExpression.length - 1);
         }
       } else if (label == '=') {
-        try {
-          double calcResult = _service.calculate(expression);
-          if (calcResult.isNaN) {
-            result = "Error";
-          } else {
-            String tempResult = calcResult.toString();
-            if (tempResult.endsWith('.0')) {
-              tempResult = tempResult.substring(0, tempResult.length - 2);
+        if (_currentExpression.isNotEmpty) {
+          try {
+            double calcResult = _service.calculate(_currentExpression);
+            if (calcResult.isNaN) {
+              _currentResult = "Error";
+            } else {
+              String tempResult = calcResult.toString();
+              if (tempResult.endsWith('.0')) {
+                tempResult = tempResult.substring(0, tempResult.length - 2);
+              }
+              _currentResult = tempResult;
+              // Push to history
+              _history.add(Calculation(_currentExpression, _currentResult));
+              _currentExpression = "";
+              _currentResult = "";
+              _scrollToBottom();
             }
-            result = tempResult;
+          } catch (e) {
+            _currentResult = "Error";
           }
-        } catch (e) {
-          result = "Error";
         }
       } else {
-        if (result.isNotEmpty) {
-          expression = label;
-          result = "";
+        // Reuse result logic
+        if (_history.isNotEmpty && _currentExpression.isEmpty && _isOperator(label)) {
+          _currentExpression = _history.last.result + label;
         } else {
-          expression += label;
+          _currentExpression += label;
         }
       }
     });
@@ -117,7 +147,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Expanded(
               flex: 5,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -126,80 +156,71 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                   child: Stack(
                     children: [
-                      // Camera icon (top‑right)
                       const Positioned(
                         top: 4,
                         right: 4,
-                        child: Icon(
-                          Icons.camera_alt_outlined,
-                          size: 22,
-                          color: CalcColors.textDark,
-                        ),
+                        child: Icon(Icons.camera_alt_outlined, size: 22, color: CalcColors.textDark),
                       ),
-                      // Crop icon (bottom‑left)
                       Positioned(
                         bottom: 10,
                         left: 10,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: CalcColors.textDark,
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Icon(
-                            Icons.crop_free,
-                            size: 16,
-                            color: CalcColors.textDark,
-                          ),
+                        child: Row(
+                          children: [
+                            _iconBox(Icons.crop_free),
+                            const SizedBox(width: 4),
+                            _iconBox(Icons.more_horiz),
+                          ],
                         ),
                       ),
-                      // Main text area (expression + result)
-                      Positioned.fill(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 5, 10, 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              // Expression line (left aligned)
-                              Row(
+                      // Scrollable content
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(6, 0, 5, 0), // leave space for bottom icons
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          itemCount: _history.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index < _history.length) {
+                              final calc = _history[index];
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Text(
-                                    expression.isEmpty ? '0' : expression,
-                                    style: const TextStyle(
-                                      fontSize: 32,
-                                      color: CalcColors.textDark,
-                                      fontFamily: 'monospace',
-                                      fontWeight: FontWeight.normal,
-                                      height: 1.0, // Tighten line height
-                                    ),
+                                    calc.expression,
+                                    style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
                                   ),
-                                  if (result.isEmpty)
-                                    Container(
-                                      width: 2.5,
-                                      height: 28,
-                                      color: CalcColors.cursor,
+                                  Text(
+                                    _formatResult(calc.result),
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                  ),
+                                  const Divider(color: Colors.black26, height: 16),
+                                ],
+                              );
+                            } else {
+                              // Current active input
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        _currentExpression.isEmpty && _history.isEmpty ? '0' : _currentExpression,
+                                        style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                      ),
+                                      if (_currentResult.isEmpty)
+                                        Container(width: 2.5, height: 28, color: CalcColors.cursor),
+                                    ],
+                                  ),
+                                  if (_currentResult.isNotEmpty)
+                                    Text(
+                                      _formatResult(_currentResult),
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(fontSize: 30, color: CalcColors.textDark, fontFamily: 'monospace'),
                                     ),
                                 ],
-                              ),
-                              // Result line (right aligned) - Tight gap
-                              if (result.isNotEmpty)
-                                Text(
-                                  _formatResult(result),
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(
-                                    fontSize: 30,
-                                    color: CalcColors.textDark,
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.normal,
-                                    height: 1.0, // Tighten line height
-                                  ),
-                                ),
-                            ],
-                          ),
+                              );
+                            }
+                          },
                         ),
                       ),
                     ],
@@ -219,35 +240,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     const SizedBox(width: 10),
                     _buildGoProButton(),
                     const SizedBox(width: 10),
-                    const Icon(
-                      Icons.settings_outlined,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                    const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
                     const SizedBox(width: 16),
-                    const Text(
-                      'Σ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 16),
-                    const Text(
-                      'RAD',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
+                    const Text('RAD', style: TextStyle(color: Colors.white, fontSize: 18)),
                     const SizedBox(width: 16),
-                    const Text(
-                      'MATH',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
+                    const Text('MATH', style: TextStyle(color: Colors.white, fontSize: 18)),
                     const SizedBox(width: 16),
-                    const Text(
-                      'DECI',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
+                    const Text('DECI', style: TextStyle(color: Colors.white, fontSize: 18)),
                   ],
                 ),
               ),
@@ -280,6 +281,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
+  Widget _iconBox(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        border: Border.all(color: CalcColors.textDark, width: 1.5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Icon(icon, size: 16, color: CalcColors.textDark),
+    );
+  }
+
   Widget _buildGoProButton() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -289,11 +301,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       ),
       child: const Text(
         'GO PRO',
-        style: TextStyle(
-          color: Colors.black,
-          fontWeight: FontWeight.bold,
-          fontSize: 11,
-        ),
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
       ),
     );
   }
