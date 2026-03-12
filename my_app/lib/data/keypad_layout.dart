@@ -25,7 +25,7 @@ final List<CalcKey> scientificKeys = [
   CalcKey(label: "√x", top: "∛x", right: "mod"),
   CalcKey(label: "x²", top: "x³", right: "x̅"),
   CalcKey(label: "xⁿ", top: "ⁿ√x", right: ""),
-  CalcKey(label: "Log", top: "10ⁿ", right: "Cot⁻¹"),
+  CalcKey(label: "Log", top: "10ⁿ", right: ""),
   CalcKey(label: "Ln", top: "eⁿ", right: "t"),
 
   // Row 4
@@ -38,10 +38,10 @@ final List<CalcKey> scientificKeys = [
 
   // Row 5
   CalcKey(label: "RCL", top: "STO", right: "CLRv"),
-  CalcKey(label: "ENG", top: "i", right: "Cot"),
-  CalcKey(label: "(", right: "x"),
-  CalcKey(label: ")", right: "y"),
-  CalcKey(label: "S⇔D", right: "z"),
+  CalcKey(label: "ENG", top: "𝒊", right: "Cot"),
+  CalcKey(label: "(",top: "%",right: "Cot⁻¹"),
+  CalcKey(label: ")",top: ",", right: "x"),
+  CalcKey(label: "S⇔D", top:"", right: "y"),
   CalcKey(label: "M+", top: "M-", right: "m"),
 ];
 
@@ -105,7 +105,7 @@ final List<CalcKey> numericKeys = [
     label: "Ans",
     color: CalcColors.btnOperator,
     textColor: Colors.black,
-    top: "%",
+    top: "~",
     right: "PreAns",
   ),
   CalcKey(
