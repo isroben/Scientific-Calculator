@@ -14,39 +14,59 @@ class CalculatorScreen extends StatefulWidget {
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
   String expression = "";
+  String result = "";
 
   final CalculatorService _service = CalculatorService();
+
+  /// Formats a decimal result by grouping digits after the decimal point
+  /// in blocks of three, separated by spaces.
+  String _formatResult(String raw) {
+    if (raw.isEmpty || raw == 'Error') return raw;
+    if (!raw.contains('.')) return raw;
+
+    final parts = raw.split('.');
+    final intPart = parts[0];
+    final fracPart = parts[1];
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < fracPart.length; i++) {
+      if (i > 0 && i % 3 == 0) buffer.write(' ');
+      buffer.write(fracPart[i]);
+    }
+    return '$intPart.${buffer.toString()}';
+  }
 
   void _onPressed(String label) {
     setState(() {
       if (label == 'CLR' || label == 'AC') {
         expression = "";
+        result = "";
       } else if (label == '⌫') {
         if (expression.isNotEmpty) {
           expression = expression.substring(0, expression.length - 1);
         }
       } else if (label == '=') {
-        // This triggers the C++ calculation
         try {
-          double result = _service.calculate(expression);
-
-          if (result.isNaN) {
-            expression = "Error";
+          double calcResult = _service.calculate(expression);
+          if (calcResult.isNaN) {
+            result = "Error";
           } else {
-            expression = result.toString();
-            // Clean up ".0" (e.g., "5.0" becomes "5")
-            if (expression.endsWith('.0')) {
-              expression = expression.substring(0, expression.length - 2);
+            String tempResult = calcResult.toString();
+            if (tempResult.endsWith('.0')) {
+              tempResult = tempResult.substring(0, tempResult.length - 2);
             }
+            result = tempResult;
           }
         } catch (e) {
-          expression = "Error";
+          result = "Error";
         }
       } else {
-        // Normal button press (numbers, +, sin, etc.)
-        // If "Error" is on screen, clear it before typing new numbers
-        if (expression == "Error") expression = "";
-        expression += label;
+        if (result.isNotEmpty) {
+          expression = label;
+          result = "";
+        } else {
+          expression += label;
+        }
       }
     });
   }
@@ -87,7 +107,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               width: double.infinity,
               color: Colors.black,
               alignment: Alignment.center,
-              child: Text(
+              child: const Text(
                 "AD BANNER SPACE",
                 style: TextStyle(color: Colors.white, fontSize: 10),
               ),
@@ -106,14 +126,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                   child: Stack(
                     children: [
-                      Align(
-                        alignment: Alignment.topRight,
+                      // Camera icon (top‑right)
+                      const Positioned(
+                        top: 4,
+                        right: 4,
                         child: Icon(
                           Icons.camera_alt_outlined,
                           size: 22,
                           color: CalcColors.textDark,
                         ),
                       ),
+                      // Crop icon (bottom‑left)
                       Positioned(
                         bottom: 10,
                         left: 10,
@@ -133,28 +156,48 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                           ),
                         ),
                       ),
-                      Align(
-                        alignment: Alignment.topLeft,
+                      // Main text area (expression + result)
+                      Positioned.fill(
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 10, right: 12),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          padding: const EdgeInsets.fromLTRB(10, 5, 10, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: [
-                              Text(
-                                expression.isEmpty ? '0' : expression,
-                                style: const TextStyle(
-                                  fontSize: 32,
-                                  color: CalcColors.textDark,
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.w500,
+                              // Expression line (left aligned)
+                              Row(
+                                children: [
+                                  Text(
+                                    expression.isEmpty ? '0' : expression,
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      color: CalcColors.textDark,
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.normal,
+                                      height: 1.0, // Tighten line height
+                                    ),
+                                  ),
+                                  if (result.isEmpty)
+                                    Container(
+                                      width: 2.5,
+                                      height: 28,
+                                      color: CalcColors.cursor,
+                                    ),
+                                ],
+                              ),
+                              // Result line (right aligned) - Tight gap
+                              if (result.isNotEmpty)
+                                Text(
+                                  _formatResult(result),
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontSize: 30,
+                                    color: CalcColors.textDark,
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.normal,
+                                    height: 1.0, // Tighten line height
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              Container(
-                                width: 2.5,
-                                height: 32,
-                                color: CalcColors.cursor,
-                              ),
                             ],
                           ),
                         ),
@@ -190,7 +233,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    // const Spacer(),
                     const SizedBox(width: 16),
                     const Text(
                       'RAD',
@@ -215,19 +257,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Expanded(
               flex: 13,
               child: Padding(
-                padding: const EdgeInsets.only(left: 4.0, right: 4.0, top: 0.0),
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: Column(
                   children: [
-                    // Scientific rows
                     _buildKeyRow(scientificKeys.sublist(0, 6), isDense: true),
                     _buildKeyRow(scientificKeys.sublist(6, 12), isDense: true),
                     _buildKeyRow(scientificKeys.sublist(12, 18), isDense: true),
                     _buildKeyRow(scientificKeys.sublist(18, 24), isDense: true),
                     _buildKeyRow(scientificKeys.sublist(24, 30), isDense: true),
-
                     const SizedBox(height: 4),
-
-                    // Numeric rows
                     _buildKeyRow(numericKeys.sublist(0, 5), isDense: false),
                     _buildKeyRow(numericKeys.sublist(5, 10), isDense: false),
                     _buildKeyRow(numericKeys.sublist(10, 15), isDense: false),
