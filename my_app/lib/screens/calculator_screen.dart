@@ -3,6 +3,7 @@ import '../constants/calc_colors.dart';
 import '../widgets/calc_button.dart';
 import '../data/keypad_layout.dart';
 import '../models/calc_key.dart';
+import '../services/calculator_service.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -14,15 +15,37 @@ class CalculatorScreen extends StatefulWidget {
 class _CalculatorScreenState extends State<CalculatorScreen> {
   String expression = "";
 
+  final CalculatorService _service = CalculatorService();
+
   void _onPressed(String label) {
     setState(() {
-      if (label == 'CLR') {
+      if (label == 'CLR' || label == 'AC') {
         expression = "";
       } else if (label == '⌫') {
         if (expression.isNotEmpty) {
           expression = expression.substring(0, expression.length - 1);
         }
+      } else if (label == '=') {
+        // This triggers the C++ calculation
+        try {
+          double result = _service.calculate(expression);
+
+          if (result.isNaN) {
+            expression = "Error";
+          } else {
+            expression = result.toString();
+            // Clean up ".0" (e.g., "5.0" becomes "5")
+            if (expression.endsWith('.0')) {
+              expression = expression.substring(0, expression.length - 2);
+            }
+          }
+        } catch (e) {
+          expression = "Error";
+        }
       } else {
+        // Normal button press (numbers, +, sin, etc.)
+        // If "Error" is on screen, clear it before typing new numbers
+        if (expression == "Error") expression = "";
         expression += label;
       }
     });
@@ -66,10 +89,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               alignment: Alignment.center,
               child: Text(
                 "AD BANNER SPACE",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 10),
               ),
             ),
 
@@ -88,7 +108,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     children: [
                       Align(
                         alignment: Alignment.topRight,
-                        child: Icon(Icons.camera_alt_outlined, size: 22, color: CalcColors.textDark),
+                        child: Icon(
+                          Icons.camera_alt_outlined,
+                          size: 22,
+                          color: CalcColors.textDark,
+                        ),
                       ),
                       Positioned(
                         bottom: 10,
@@ -96,10 +120,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            border: Border.all(color: CalcColors.textDark, width: 1.5),
+                            border: Border.all(
+                              color: CalcColors.textDark,
+                              width: 1.5,
+                            ),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Icon(Icons.crop_free, size: 16, color: CalcColors.textDark),
+                          child: const Icon(
+                            Icons.crop_free,
+                            size: 16,
+                            color: CalcColors.textDark,
+                          ),
                         ),
                       ),
                       Align(
@@ -119,7 +150,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Container(width: 2.5, height: 32, color: CalcColors.cursor),
+                              Container(
+                                width: 2.5,
+                                height: 32,
+                                color: CalcColors.cursor,
+                              ),
                             ],
                           ),
                         ),
@@ -141,16 +176,36 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     const SizedBox(width: 10),
                     _buildGoProButton(),
                     const SizedBox(width: 10),
-                    const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                    const Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                     const SizedBox(width: 16),
-                    const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Σ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     // const Spacer(),
                     const SizedBox(width: 16),
-                    const Text('RAD', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'RAD',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                     const SizedBox(width: 16),
-                    const Text('MATH', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'MATH',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                     const SizedBox(width: 16),
-                    const Text('DECI', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'DECI',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                   ],
                 ),
               ),
@@ -196,7 +251,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       ),
       child: const Text(
         'GO PRO',
-        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
       ),
     );
   }

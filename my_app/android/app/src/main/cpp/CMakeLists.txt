@@ -1,14 +1,8 @@
-cmake_minimum_required(VERSION 3.10.2)
+cmake_minimum_required(VERSION 3.18.1)
+project(calc_engine)
 
-project(calculator_native VERSION 0.0.1 LANGUAGES CXX)
+add_library(calc_engine SHARED
+            calc_engine.cpp
+            calculator.cpp) # Path from cpp folder to root src
 
-# The path to calculator.cpp relative to this CMakeLists.txt
-# From my_app/android/app/src/main/cpp/ to my_app/src/calculator.cpp
-# 1: main, 2: src, 3: app, 4: android, 5: my_app
-add_library(calculator_native SHARED
-  ../../../../../src/calculator.cpp
-)
-
-set_target_properties(calculator_native PROPERTIES
-  OUTPUT_NAME "calculator_native"
-)
+target_link_libraries(calc_engine android log)

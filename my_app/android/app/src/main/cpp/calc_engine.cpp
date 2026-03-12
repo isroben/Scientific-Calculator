@@ -1,21 +1,16 @@
-#include <string>
-#include <cmath>
+#include <jni.h>
 
-// Your future Shunting-Yard parser will go here
-double parseAndEvaluate(const std::string& expr) {
-    // For now, let's just return a dummy value so we can test the bridge
-    return 42.0; 
-}
+// Forward declaration: tells this file the function exists in calculator.cpp
+extern "C" double evaluate_expression(const char* expression);
 
-// The C-Bridge that Dart will talk to
-extern "C" {
-    // __attribute__ forces the compiler to keep this function visible
-    __attribute__((visibility("default"))) __attribute__((used))
-    double evaluate_expression(const char* expression) {
-        // Convert the C-style string to a C++ std::string
-        std::string expr(expression);
-        
-        // Run your complex logic
-        return parseAndEvaluate(expr);
-    }
+extern "C"
+JNIEXPORT jdouble JNICALL
+Java_com_example_myapp_NativeTester_evaluate(JNIEnv *env, jobject thiz, jstring expression) {
+    const char *nativeString = env->GetStringUTFChars(expression, 0);
+
+    // Call the function from calculator.cpp
+    double result = evaluate_expression(nativeString);
+
+    env->ReleaseStringUTFChars(expression, nativeString);
+    return result;
 }

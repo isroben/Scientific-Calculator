@@ -5,43 +5,55 @@ import 'package:ffi/ffi.dart';
 typedef EvaluateExpressionNative = Double Function(Pointer<Utf8> expression);
 typedef EvaluateExpression = double Function(Pointer<Utf8> expression);
 
-typedef MathFuncNative = Double Function(Double value);
-typedef MathFunc = double Function(double value);
-
 class CalculatorService {
   late DynamicLibrary _lib;
   late EvaluateExpression _evaluateExpression;
-  late MathFunc _sin;
-  late MathFunc _cos;
-  late MathFunc _tan;
-  late MathFunc _sqrt;
 
   CalculatorService() {
+    // Note: Ensure your CMake project name is 'calc_engine' to match libcalc_engine.so
     _lib = Platform.isAndroid
-        ? DynamicLibrary.open('libcalculator_native.so')
+        ? DynamicLibrary.open('libcalc_engine.so')
         : DynamicLibrary.process();
 
     _evaluateExpression = _lib
-        .lookup<NativeFunction<EvaluateExpressionNative>>('evaluate_expression')
-        .asFunction();
-
-    _sin = _lib.lookup<NativeFunction<MathFuncNative>>('calculate_sin').asFunction();
-    _cos = _lib.lookup<NativeFunction<MathFuncNative>>('calculate_cos').asFunction();
-    _tan = _lib.lookup<NativeFunction<MathFuncNative>>('calculate_tan').asFunction();
-    _sqrt = _lib.lookup<NativeFunction<MathFuncNative>>('calculate_sqrt').asFunction();
+        .lookupFunction<EvaluateExpressionNative, EvaluateExpression>('evaluate_expression');
   }
 
-  double evaluate(String expression) {
-    final ptr = expression.toNativeUtf8();
+  double calculate(String uiExpression) {
+    if (uiExpression.isEmpty) return 0.0;
+
+    // STEP 1: Translate UI symbols to C++ Math Strings
+    String mathString = uiExpression
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/')
+        .replaceAll('sin', 'sin(') // Add opening bracket for the engine
+        .replaceAll('cos', 'cos(')
+        .replaceAll('tan', 'tan(')
+        .replaceAll('log', 'log(')
+        .replaceAll('ln', 'ln(')
+        .replaceAll('√', 'sqrt(')
+        .replaceAll('π', '3.14159265359')
+        .replaceAll('e', '2.71828182846');
+
+    // Handle powers: x² -> ^2
+    mathString = mathString.replaceAll('²', '^2').replaceAll('³', '^3');
+
+    // STEP 2: Balanced Parentheses (Auto-close brackets if user forgot)
+    int openBrackets = '('.allMatches(mathString).length;
+    int closeBrackets = ')'.allMatches(mathString).length;
+    while (openBrackets > closeBrackets) {
+      mathString += ')';
+      closeBrackets++;
+    }
+
+    // STEP 3: Pass to C++
+    final ptr = mathString.toNativeUtf8();
     try {
       return _evaluateExpression(ptr);
+    } catch (e) {
+      return double.nan;
     } finally {
       malloc.free(ptr);
     }
   }
-
-  double sin(double val) => _sin(val);
-  double cos(double val) => _cos(val);
-  double tan(double val) => _tan(val);
-  double sqrt(double val) => _sqrt(val);
 }
