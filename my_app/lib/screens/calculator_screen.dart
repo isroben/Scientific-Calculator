@@ -23,7 +23,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final List<Calculation> _history = [];
   String _currentExpression = "";
   String _currentResult = "";
-  bool _hasPerformedFirstCalculation = false;
+  bool _isShowingResult = false;
   late Timer _cursorTimer;
   bool _showCursor = true;
   final ScrollController _scrollController = ScrollController();
@@ -87,16 +87,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         _currentExpression = "";
         _currentResult = "";
         _history.clear();
-        _hasPerformedFirstCalculation = false;
+        _isShowingResult = false;
       } else if (label == '⌫') {
-        if (_currentExpression.isNotEmpty) {
+        if (_isShowingResult) {
+          _isShowingResult = false;
+          _currentResult = "";
+        } else if (_currentExpression.isNotEmpty) {
           _currentExpression = _currentExpression.substring(
             0,
             _currentExpression.length - 1,
           );
         }
       } else if (label == '=') {
-        if (_currentExpression.isNotEmpty) {
+        if (_currentExpression.isNotEmpty && !_isShowingResult) {
           try {
             double calcResult = _service.calculate(_currentExpression);
             if (calcResult.isNaN) {
@@ -107,27 +110,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 tempResult = tempResult.substring(0, tempResult.length - 2);
               }
               _currentResult = tempResult;
-              // Push to history
-              _history.add(Calculation(_currentExpression, _currentResult));
-              _currentExpression = "";
-              _currentResult = "";
-
-              if (_hasPerformedFirstCalculation) {
-                _scrollToBottom();
-              } else {
-                _hasPerformedFirstCalculation = true;
-              }
+              _isShowingResult = true;
             }
           } catch (e) {
             _currentResult = "Error";
           }
         }
       } else {
-        // Reuse result logic
-        if (_history.isNotEmpty &&
-            _currentExpression.isEmpty &&
-            _isOperator(label)) {
-          _currentExpression = _history.last.result + label;
+        if (_isShowingResult) {
+          // Push current to history when starting a NEW calculation
+          _history.add(Calculation(_currentExpression, _currentResult));
+          
+          if (_isOperator(label)) {
+            _currentExpression = _currentResult + label;
+          } else {
+            _currentExpression = label;
+          }
+          _currentResult = "";
+          _isShowingResult = false;
+          _scrollToBottom();
         } else {
           _currentExpression += label;
         }
@@ -190,6 +191,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                   child: Stack(
                     children: [
+                      // Camera icon (top‑right)
                       const Positioned(
                         top: 4,
                         right: 4,
@@ -199,6 +201,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                           color: CalcColors.textDark,
                         ),
                       ),
+                      // Icons (bottom‑left)
                       Positioned(
                         bottom: 10,
                         left: 10,
@@ -212,21 +215,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       ),
                       // Scrollable content
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          6,
-                          0,
-                          5,
-                          0,
-                        ), // leave space for bottom icons
+                        padding: const EdgeInsets.fromLTRB(6, 0, 5, 0),
                         child: ListView.builder(
                           controller: _scrollController,
                           itemCount: _history.length + 1,
-                          padding: EdgeInsets.only(bottom: 60),
+                          padding: const EdgeInsets.only(bottom: 40),
                           itemBuilder: (context, index) {
                             if (index < _history.length) {
                               final calc = _history[index];
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     calc.expression,
@@ -234,7 +233,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                       fontSize: 28,
                                       color: CalcColors.textDark,
                                       fontFamily: 'monospace',
-                                      height: 1.25,
+                                      height: 1.0,
                                     ),
                                   ),
                                   Text(
@@ -244,12 +243,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                       fontSize: 28,
                                       color: CalcColors.textDark,
                                       fontFamily: 'monospace',
-                                      height: 1,
+                                      height: 1.0,
                                     ),
                                   ),
                                   const Divider(
                                     color: Colors.black26,
-                                    height: 5,
+                                    height: 8,
+                                    thickness: 1,
                                   ),
                                 ],
                               );
@@ -257,8 +257,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                               // Current active input
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
                                         _currentExpression.isEmpty &&
@@ -269,9 +271,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                           fontSize: 28,
                                           color: CalcColors.textDark,
                                           fontFamily: 'monospace',
+                                          height: 1.0,
                                         ),
                                       ),
-                                      if (_currentResult.isEmpty && _showCursor)
+                                      if (!_isShowingResult && _showCursor)
                                         Container(
                                           width: 2.5,
                                           height: 24,
@@ -287,6 +290,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                         fontSize: 28,
                                         color: CalcColors.textDark,
                                         fontFamily: 'monospace',
+                                        height: 1.0,
                                       ),
                                     ),
                                 ],
