@@ -4,6 +4,7 @@ import '../widgets/calc_button.dart';
 import '../data/keypad_layout.dart';
 import '../models/calc_key.dart';
 import '../services/calculator_service.dart';
+import 'dart:async';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -22,9 +23,31 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final List<Calculation> _history = [];
   String _currentExpression = "";
   String _currentResult = "";
+  bool _hasPerformedFirstCalculation = false;
+  late Timer _cursorTimer;
+  bool _showCursor = true;
   final ScrollController _scrollController = ScrollController();
 
   final CalculatorService _service = CalculatorService();
+
+  @override
+  void initState() {
+    super.initState();
+    _cursorTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      if (mounted) {
+        setState(() {
+          _showCursor = !_showCursor;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cursorTimer.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -64,6 +87,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         _currentExpression = "";
         _currentResult = "";
         _history.clear();
+        _hasPerformedFirstCalculation = false;
       } else if (label == '⌫') {
         if (_currentExpression.isNotEmpty) {
           _currentExpression = _currentExpression.substring(
@@ -87,7 +111,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               _history.add(Calculation(_currentExpression, _currentResult));
               _currentExpression = "";
               _currentResult = "";
-              _scrollToBottom();
+
+              if (_hasPerformedFirstCalculation) {
+                _scrollToBottom();
+              } else {
+                _hasPerformedFirstCalculation = true;
+              }
             }
           } catch (e) {
             _currentResult = "Error";
@@ -152,7 +181,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Expanded(
               flex: 5,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -192,6 +221,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         child: ListView.builder(
                           controller: _scrollController,
                           itemCount: _history.length + 1,
+                          padding: EdgeInsets.only(bottom: 60),
                           itemBuilder: (context, index) {
                             if (index < _history.length) {
                               final calc = _history[index];
@@ -214,12 +244,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                       fontSize: 28,
                                       color: CalcColors.textDark,
                                       fontFamily: 'monospace',
-                                      height: 1.0,
+                                      height: 1,
                                     ),
                                   ),
                                   const Divider(
                                     color: Colors.black26,
-                                    height: 1,
+                                    height: 5,
                                   ),
                                 ],
                               );
@@ -241,7 +271,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                           fontFamily: 'monospace',
                                         ),
                                       ),
-                                      if (_currentResult.isEmpty)
+                                      if (_currentResult.isEmpty && _showCursor)
                                         Container(
                                           width: 2.5,
                                           height: 24,
@@ -254,7 +284,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                       _formatResult(_currentResult),
                                       textAlign: TextAlign.right,
                                       style: const TextStyle(
-                                        fontSize: 30,
+                                        fontSize: 28,
                                         color: CalcColors.textDark,
                                         fontFamily: 'monospace',
                                       ),
