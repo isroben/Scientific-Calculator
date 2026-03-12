@@ -66,7 +66,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         _history.clear();
       } else if (label == '⌫') {
         if (_currentExpression.isNotEmpty) {
-          _currentExpression = _currentExpression.substring(0, _currentExpression.length - 1);
+          _currentExpression = _currentExpression.substring(
+            0,
+            _currentExpression.length - 1,
+          );
         }
       } else if (label == '=') {
         if (_currentExpression.isNotEmpty) {
@@ -92,7 +95,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         }
       } else {
         // Reuse result logic
-        if (_history.isNotEmpty && _currentExpression.isEmpty && _isOperator(label)) {
+        if (_history.isNotEmpty &&
+            _currentExpression.isEmpty &&
+            _isOperator(label)) {
           _currentExpression = _history.last.result + label;
         } else {
           _currentExpression += label;
@@ -159,7 +164,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       const Positioned(
                         top: 4,
                         right: 4,
-                        child: Icon(Icons.camera_alt_outlined, size: 22, color: CalcColors.textDark),
+                        child: Icon(
+                          Icons.camera_alt_outlined,
+                          size: 22,
+                          color: CalcColors.textDark,
+                        ),
                       ),
                       Positioned(
                         bottom: 10,
@@ -174,7 +183,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       ),
                       // Scrollable content
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(6, 0, 5, 0), // leave space for bottom icons
+                        padding: const EdgeInsets.fromLTRB(
+                          6,
+                          0,
+                          5,
+                          0,
+                        ), // leave space for bottom icons
                         child: ListView.builder(
                           controller: _scrollController,
                           itemCount: _history.length + 1,
@@ -186,14 +200,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                 children: [
                                   Text(
                                     calc.expression,
-                                    style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      color: CalcColors.textDark,
+                                      fontFamily: 'monospace',
+                                      height: 1.25,
+                                    ),
                                   ),
                                   Text(
                                     _formatResult(calc.result),
                                     textAlign: TextAlign.right,
-                                    style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      color: CalcColors.textDark,
+                                      fontFamily: 'monospace',
+                                      height: 1.0,
+                                    ),
                                   ),
-                                  const Divider(color: Colors.black26, height: 16),
+                                  const Divider(
+                                    color: Colors.black26,
+                                    height: 1,
+                                  ),
                                 ],
                               );
                             } else {
@@ -204,18 +231,33 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        _currentExpression.isEmpty && _history.isEmpty ? '0' : _currentExpression,
-                                        style: const TextStyle(fontSize: 28, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                        _currentExpression.isEmpty &&
+                                                _history.isEmpty
+                                            ? '0'
+                                            : _currentExpression,
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          color: CalcColors.textDark,
+                                          fontFamily: 'monospace',
+                                        ),
                                       ),
                                       if (_currentResult.isEmpty)
-                                        Container(width: 2.5, height: 28, color: CalcColors.cursor),
+                                        Container(
+                                          width: 2.5,
+                                          height: 24,
+                                          color: CalcColors.cursor,
+                                        ),
                                     ],
                                   ),
                                   if (_currentResult.isNotEmpty)
                                     Text(
                                       _formatResult(_currentResult),
                                       textAlign: TextAlign.right,
-                                      style: const TextStyle(fontSize: 30, color: CalcColors.textDark, fontFamily: 'monospace'),
+                                      style: const TextStyle(
+                                        fontSize: 30,
+                                        color: CalcColors.textDark,
+                                        fontFamily: 'monospace',
+                                      ),
                                     ),
                                 ],
                               );
@@ -240,15 +282,35 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     const SizedBox(width: 10),
                     _buildGoProButton(),
                     const SizedBox(width: 10),
-                    const Icon(Icons.settings_outlined, color: Colors.white, size: 22),
+                    const Icon(
+                      Icons.settings_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                     const SizedBox(width: 16),
-                    const Text('Σ', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Σ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(width: 16),
-                    const Text('RAD', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'RAD',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                     const SizedBox(width: 16),
-                    const Text('MATH', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'MATH',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                     const SizedBox(width: 16),
-                    const Text('DECI', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    const Text(
+                      'DECI',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                   ],
                 ),
               ),
@@ -301,7 +363,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       ),
       child: const Text(
         'GO PRO',
-        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
       ),
     );
   }
