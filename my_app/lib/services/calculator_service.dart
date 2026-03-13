@@ -26,6 +26,7 @@ class CalculatorService {
   static const _space = 32;
   static const _p = 80; // nPr
   static const _c = 67; // nCr
+  static const _root = 8730; // '√'
 
   String _expr = '';
   int _pos = -1;
@@ -140,9 +141,17 @@ class CalculatorService {
       return double.nan;
     }
 
-    // Post-fix operators (right-to-left for ^)
+    // Post-fix operators (right-to-left for ^, and infix for √)
     if (_eat(_caret)) x = math.pow(x, _parseFactor()).toDouble();
     if (_eat(_bang)) x = _factorial(x);
+    if (_eat(_root)) {
+      final radicand = _parseFactor();
+      if (radicand < 0 && x % 2 != 0 && x % 1 == 0) {
+        x = -math.pow(-radicand, 1 / x).toDouble();
+      } else {
+        x = math.pow(radicand, 1 / x).toDouble();
+      }
+    }
 
     return x;
   }
@@ -261,6 +270,7 @@ class CalculatorService {
         .replaceAll('²', '^2')
         .replaceAll('³', '^3')
         .replaceAll('ⁿ', '^')
+        .replaceAll('∛', 'cbrt')
         .replaceAll(' ', '');
 
     _expr = mathString;

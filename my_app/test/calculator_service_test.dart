@@ -78,6 +78,12 @@ void main() {
       final result = service.calculate('cbrt(27)');
       expect(result, closeTo(3.0, 1e-10));
     });
+
+    test('nth root', () {
+      expect(service.calculate('3√8'), 2.0);
+      expect(service.calculate('5√32'), 2.0);
+      expect(service.calculate('3√-8'), -2.0);
+    });
   });
 
   group('Trigonometry (degree mode)', () {

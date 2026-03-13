@@ -69,9 +69,8 @@ class CalculatorState extends ChangeNotifier {
     'Cos': 'cos',
     'Tan': 'tan',
     'Cot': 'cot',
-    '√x': 'sqrt',
-    '∛x': 'cbrt',
-    'ⁿ√x': 'root',
+    '√x': '√',
+    '∛x': '∛',
     // Logs
     'Log': 'log',
     'Ln': 'ln',
@@ -312,6 +311,13 @@ class CalculatorState extends ChangeNotifier {
     // Parentheses
     if (label == '(' || label == ')') {
       _insertAtCursor(label);
+      return;
+    }
+
+    // Specific handler for nth root (positions cursor backward to type n)
+    if (label == 'ⁿ√x') {
+      _insertAtCursor('√(');
+      _cursorPosition -= 2;
       return;
     }
 
