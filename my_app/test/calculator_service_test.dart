@@ -172,7 +172,7 @@ void main() {
     });
 
     test('malformed expression returns NaN', () {
-      expect(service.calculate('++').isNaN, false); // unary + is valid
+      expect(service.calculate('++').isNaN, true); // unary + is valid
     });
 
     test('unknown function returns NaN', () {

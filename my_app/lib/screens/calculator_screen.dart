@@ -215,7 +215,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   List<InlineSpan> _buildExpressionSpans(String before, String after, bool showCursor, bool isResultText) {
     final spans = <InlineSpan>[];
-    final text = before + '\u200B' + after;
+    final text = '$before\u200B$after';
 
     bool inExponent = false;
     int parenDepth = 0;
@@ -258,10 +258,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         flushSuperscript();
         if (!isResultText) {
           spans.add(WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
+            alignment: inExponent ? PlaceholderAlignment.top : PlaceholderAlignment.middle,
             child: Opacity(
               opacity: showCursor ? 1.0 : 0.0,
-              child: Container(width: 2.5, height: 28, color: CalcColors.cursor),
+              child: Container(
+                width: 2.5, 
+                height: inExponent ? 16 : 28, 
+                color: CalcColors.cursor,
+                margin: inExponent ? const EdgeInsets.only(top: 2.0) : EdgeInsets.zero,
+              ),
             ),
           ));
         }
@@ -296,6 +301,33 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         flushSuperscript();
         inExponent = true;
         parenDepth = 0;
+
+        bool isEmptyExponent = true;
+        for (int j = i + 1; j < text.length; j++) {
+          if (text[j] == '\u200B') continue;
+          if (RegExp(r'[0-9.a-zA-Zπe(]').hasMatch(text[j]) || text[j] == '-') {
+            isEmptyExponent = false;
+          }
+          break;
+        }
+
+        if (isEmptyExponent) {
+          spans.add(const WidgetSpan(
+            alignment: PlaceholderAlignment.top,
+            child: Padding(
+              padding: EdgeInsets.only(top: 2.0),
+              child: Text(
+                '□',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black38,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ));
+        }
         continue;
       }
 

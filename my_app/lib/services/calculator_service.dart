@@ -24,8 +24,8 @@ class CalculatorService {
   static const _a = 97; // 'a'
   static const _z = 122; // 'z'
   static const _space = 32;
-  static const _P = 80; // nPr
-  static const _C = 67; // nCr
+  static const _p = 80; // nPr
+  static const _c = 67; // nCr
 
   String _expr = '';
   int _pos = -1;
@@ -74,10 +74,10 @@ class CalculatorService {
       } else if (_eat(_percent)) {
         // Modulo
         x = x % _parseFactor();
-      } else if (_eat(_P)) {
+      } else if (_eat(_p)) {
         // nPr
         x = _nPr(x, _parseFactor());
-      } else if (_eat(_C)) {
+      } else if (_eat(_c)) {
         // nCr
         x = _nCr(x, _parseFactor());
       } else {
