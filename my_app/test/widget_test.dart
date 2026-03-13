@@ -14,6 +14,6 @@ void main() {
     expect(find.text('7'), findsOneWidget);
     expect(find.text('8'), findsOneWidget);
     expect(find.text('9'), findsOneWidget);
-    expect(find.text('='), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, '='), findsOneWidget);
   });
 }

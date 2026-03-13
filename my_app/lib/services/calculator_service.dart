@@ -1,16 +1,44 @@
 import 'dart:math' as math;
 
+/// Recursive-descent expression parser and evaluator.
+///
+/// Grammar (from lowest to highest precedence):
+///   expression = term (('+' | '-') term)*
+///   term       = factor (('*' | '/' | '%' | 'P' | 'C') factor)*
+///   factor     = ['+' | '-'] atom ('^' factor)? ('!')?
+///   atom       = number | constant | function '(' expression ')' | '(' expression ')'
 class CalculatorService {
-  String _expr = "";
+  // ── ASCII code points (readable names instead of magic numbers) ──────
+  static const _plus = 43; // '+'
+  static const _minus = 45; // '-'
+  static const _star = 42; // '*'
+  static const _slash = 47; // '/'
+  static const _percent = 37; // '%'
+  static const _caret = 94; // '^'
+  static const _bang = 33; // '!'
+  static const _lparen = 40; // '('
+  static const _rparen = 41; // ')'
+  static const _dot = 46; // '.'
+  static const _zero = 48; // '0'
+  static const _nine = 57; // '9'
+  static const _a = 97; // 'a'
+  static const _z = 122; // 'z'
+  static const _space = 32;
+  static const _P = 80; // nPr
+  static const _C = 67; // nCr
+
+  String _expr = '';
   int _pos = -1;
   int _ch = -1;
+
+  // ── Tokeniser helpers ────────────────────────────────────────────────
 
   void _nextChar() {
     _ch = (++_pos < _expr.length) ? _expr.codeUnitAt(_pos) : -1;
   }
 
   bool _eat(int charToEat) {
-    while (_ch == 32) { // space
+    while (_ch == _space) {
       _nextChar();
     }
     if (_ch == charToEat) {
@@ -20,12 +48,14 @@ class CalculatorService {
     return false;
   }
 
+  // ── Parser ───────────────────────────────────────────────────────────
+
   double _parseExpression() {
     double x = _parseTerm();
     for (;;) {
-      if (_eat(43)) { // +
+      if (_eat(_plus)) {
         x += _parseTerm();
-      } else if (_eat(45)) { // -
+      } else if (_eat(_minus)) {
         x -= _parseTerm();
       } else {
         return x;
@@ -36,14 +66,19 @@ class CalculatorService {
   double _parseTerm() {
     double x = _parseFactor();
     for (;;) {
-      if (_eat(42)) { // *
+      if (_eat(_star)) {
         x *= _parseFactor();
-      } else if (_eat(47)) { // /
-        double divisor = _parseFactor();
+      } else if (_eat(_slash)) {
+        final divisor = _parseFactor();
         x = (divisor != 0) ? x / divisor : double.nan;
-      } else if (_eat(80)) { // P (nPr)
+      } else if (_eat(_percent)) {
+        // Modulo
+        x = x % _parseFactor();
+      } else if (_eat(_P)) {
+        // nPr
         x = _nPr(x, _parseFactor());
-      } else if (_eat(67)) { // C (nCr)
+      } else if (_eat(_C)) {
+        // nCr
         x = _nCr(x, _parseFactor());
       } else {
         return x;
@@ -52,68 +87,144 @@ class CalculatorService {
   }
 
   double _parseFactor() {
-    if (_eat(43)) return _parseFactor(); // +
-    if (_eat(45)) return -_parseFactor(); // -
+    // Unary +/-
+    if (_eat(_plus)) return _parseFactor();
+    if (_eat(_minus)) return -_parseFactor();
 
     double x;
-    int startPos = _pos;
-    if (_eat(40)) { // (
+    final startPos = _pos;
+
+    if (_eat(_lparen)) {
+      // Parenthesised sub-expression
       x = _parseExpression();
-      _eat(41); // )
-    } else if ((_ch >= 48 && _ch <= 57) || _ch == 46) { // 0-9 or .
-      while ((_ch >= 48 && _ch <= 57) || _ch == 46) {
+      _eat(_rparen);
+    } else if ((_ch >= _zero && _ch <= _nine) || _ch == _dot) {
+      // Number literal
+      while ((_ch >= _zero && _ch <= _nine) || _ch == _dot) {
         _nextChar();
       }
       x = double.parse(_expr.substring(startPos, _pos));
-    } else if (_ch >= 97 && _ch <= 122 || _ch > 127) { // a-z or non-ascii (like symbols)
-      while (_ch >= 97 && _ch <= 122 || _ch > 127) {
+    } else if ((_ch >= _a && _ch <= _z) || _ch > 127) {
+      // Identifier (function name or constant) — lowercase + non-ASCII
+      while ((_ch >= _a && _ch <= _z) || _ch > 127) {
         _nextChar();
       }
-      String func = _expr.substring(startPos, _pos);
-      if (func == "pi" || func == "π") {
+      final name = _expr.substring(startPos, _pos);
+
+      // ── Constants (no parentheses needed) ──
+      if (name == 'π' || name == 'pi') {
         x = math.pi;
-      } else if (func == "e") {
+      } else if (name == 'e' && !_eat(_lparen)) {
+        // lone 'e' without '(' is Euler's number
         x = math.e;
       } else {
-        if (_eat(40)) {
+        // ── Functions — parse argument ──
+        if (name != 'e') {
+          // normal function: expect '(' arg ')'
+          if (!_eat(_lparen)) {
+            // allow implicit argument (no parens)
+            x = _parseFactor();
+          } else {
+            x = _parseExpression();
+            _eat(_rparen);
+          }
+        } else {
+          // 'e' followed by '(' — we already consumed '(' above
           x = _parseExpression();
-          _eat(41);
-        } else {
-          x = _parseFactor();
+          _eat(_rparen);
         }
-        if (func == "sqrt" || func == "√") {
-          x = math.sqrt(x);
-        } else if (func == "sin") {
-          x = math.sin(x * math.pi / 180.0);
-        } else if (func == "cos") {
-          x = math.cos(x * math.pi / 180.0);
-        } else if (func == "tan") {
-          x = math.tan(x * math.pi / 180.0);
-        } else if (func == "log") {
-          x = math.log(x) / math.ln10;
-        } else if (func == "ln") {
-          x = math.log(x);
-        } else if (func == "abs") {
-          x = x.abs();
-        } else if (func == "fact") {
-          x = _factorial(x);
-        } else if (func == "ceil") {
-          x = x.ceilToDouble();
-        } else if (func == "floor") {
-          x = x.floorToDouble();
-        } else {
-          return double.nan;
-        }
+
+        x = _applyFunction(name, x);
       }
     } else {
       return double.nan;
     }
 
-    if (_eat(94)) x = math.pow(x, _parseFactor()).toDouble(); // ^
-    if (_eat(33)) x = _factorial(x); // !
+    // Post-fix operators (right-to-left for ^)
+    if (_eat(_caret)) x = math.pow(x, _parseFactor()).toDouble();
+    if (_eat(_bang)) x = _factorial(x);
 
     return x;
   }
+
+  // ── Function dispatch ────────────────────────────────────────────────
+
+  double _applyFunction(String name, double x) {
+    switch (name) {
+      // Roots
+      case 'sqrt':
+      case '√':
+        return math.sqrt(x);
+      case 'cbrt':
+        return math.pow(x, 1 / 3).toDouble();
+
+      // Powers / convenience
+      case 'sq':
+        return x * x;
+      case 'cube':
+        return x * x * x;
+
+      // Trigonometric (input in degrees)
+      case 'sin':
+        return math.sin(_toRadians(x));
+      case 'cos':
+        return math.cos(_toRadians(x));
+      case 'tan':
+        return math.tan(_toRadians(x));
+      case 'cot':
+        return 1 / math.tan(_toRadians(x));
+
+      // Inverse trigonometric (output in degrees)
+      case 'asin':
+        return _toDegrees(math.asin(x));
+      case 'acos':
+        return _toDegrees(math.acos(x));
+      case 'atan':
+        return _toDegrees(math.atan(x));
+      case 'acot':
+        return _toDegrees(math.atan(1 / x));
+
+      // Hyperbolic
+      case 'sinh':
+        return _sinh(x);
+      case 'cosh':
+        return _cosh(x);
+      case 'tanh':
+        return _tanh(x);
+
+      // Logarithmic
+      case 'log':
+        return math.log(x) / math.ln10;
+      case 'ln':
+        return math.log(x);
+
+      // Misc
+      case 'abs':
+        return x.abs();
+      case 'fact':
+        return _factorial(x);
+      case 'ceil':
+        return x.ceilToDouble();
+      case 'floor':
+        return x.floorToDouble();
+
+      // e^x handled via caret
+      case 'e':
+        return math.pow(math.e, x).toDouble();
+
+      default:
+        return double.nan;
+    }
+  }
+
+  // ── Maths helpers ────────────────────────────────────────────────────
+
+  double _toRadians(double deg) => deg * math.pi / 180.0;
+  double _toDegrees(double rad) => rad * 180.0 / math.pi;
+
+  double _sinh(double x) => (math.exp(x) - math.exp(-x)) / 2;
+  double _cosh(double x) => (math.exp(x) + math.exp(-x)) / 2;
+  double _tanh(double x) => _sinh(x) / _cosh(x);
 
   double _factorial(double n) {
     if (n < 0 || n > 170) return double.nan;
@@ -135,21 +246,18 @@ class CalculatorService {
     return _factorial(n) / (_factorial(r) * _factorial(n - r));
   }
 
+  // ── Public API ───────────────────────────────────────────────────────
+
+  /// Evaluate a UI expression string (with Unicode operators) and return
+  /// the numeric result. Returns [double.nan] on any error.
   double calculate(String uiExpression) {
     if (uiExpression.isEmpty) return 0.0;
 
-    String mathString = uiExpression
+    final mathString = uiExpression
         .replaceAll('×', '*')
         .replaceAll('÷', '/')
         .replaceAll('mod', '%')
-        .replaceAll('sin', 'sin')
-        .replaceAll('cos', 'cos')
-        .replaceAll('tan', 'tan')
-        .replaceAll('log', 'log')
-        .replaceAll('ln', 'ln')
-        .replaceAll('√', 'sqrt')
         .replaceAll('π', 'pi')
-        .replaceAll('e', 'e')
         .replaceAll('²', '^2')
         .replaceAll('³', '^3')
         .replaceAll('ⁿ', '^')
@@ -158,11 +266,12 @@ class CalculatorService {
     _expr = mathString;
     _pos = -1;
     _nextChar();
+
     try {
-      double result = _parseExpression();
+      final result = _parseExpression();
       if (_pos < _expr.length) return double.nan;
       return result;
-    } catch (e) {
+    } catch (_) {
       return double.nan;
     }
   }
