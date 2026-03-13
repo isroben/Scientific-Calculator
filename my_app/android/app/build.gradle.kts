@@ -26,13 +26,6 @@ android {
         versionName = flutter.versionName
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-        }
-    }
-
-
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("debug")
