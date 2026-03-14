@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_app/services/calculator_state.dart';
+import 'package:my_app/services/calculator_service.dart';
 
 void main() {
   late CalculatorState state;
@@ -168,11 +169,16 @@ void main() {
       state.onKeyPressed('÷');
       state.onKeyPressed('3');
       state.onKeyPressed('=');
-      expect(state.isFractionDisplay, true);
-      state.onKeyPressed('S⇔D');
+      state.onKeyPressed('1');
+      state.onKeyPressed('÷');
+      state.onKeyPressed('3');
+      state.onKeyPressed('=');
+      // Default is DECI (false), so isFractionDisplay should be false
       expect(state.isFractionDisplay, false);
       state.onKeyPressed('S⇔D');
       expect(state.isFractionDisplay, true);
+      state.onKeyPressed('S⇔D');
+      expect(state.isFractionDisplay, false);
     });
   });
 
@@ -200,6 +206,126 @@ void main() {
 
     test('returns Error unchanged', () {
       expect(formatDecimal('Error'), 'Error');
+    });
+  });
+
+  group('New Functions and Modes', () {
+    test('MODE toggles angleUnit', () {
+      expect(state.angleUnit, AngleUnit.degree);
+      state.onKeyPressed('MODE');
+      expect(state.angleUnit, AngleUnit.radian);
+      state.onKeyPressed('MODE');
+      expect(state.angleUnit, AngleUnit.gradian);
+      state.onKeyPressed('MODE');
+      expect(state.angleUnit, AngleUnit.degree);
+    });
+
+    test('SHIFT + ∫dx (d/dx) inserts diff(', () {
+      state.onKeyPressed('SHIFT');
+      state.onKeyPressed('∫dx');
+      expect(state.currentExpression, 'diff(');
+    });
+
+    test('SHIFT + x² (x³) inserts ³', () {
+      state.onKeyPressed('SHIFT');
+      state.onKeyPressed('x²');
+      expect(state.currentExpression, '³');
+    });
+
+    test('SHIFT + xⁿ (ⁿ√x) inserts √( and moves cursor', () {
+      state.onKeyPressed('SHIFT');
+      state.onKeyPressed('xⁿ');
+      expect(state.currentExpression, '√(');
+      // "√(" length is 2. Cursor starts at 0, inserts "√(" -> cursor at 2.
+      // then moves back by 2 -> cursor at 0.
+      expect(state.cursorPosition, 0);
+    });
+  });
+
+  group('ALPHA Functionality and Variables', () {
+    test('ALPHA + ) inserts variable x', () {
+      state.onKeyPressed('ALPHA');
+      state.onKeyPressed(')');
+      expect(state.currentExpression, 'x');
+    });
+
+    // Note: STO is current mapped to just _memory for simplicity in state,
+    // but variables A-F, M, X, Y, T work as identifiers in expressions.
+    test('Using variable x in expression', () {
+      state.onKeyPressed('ALPHA');
+      state.onKeyPressed(')'); // inserts 'x'
+      state.onKeyPressed('+');
+      state.onKeyPressed('5');
+      state.onKeyPressed('=');
+      // x defaults to 0
+      expect(state.currentResult, '5');
+    });
+
+    test('PreAns holds previous result', () {
+      state.onKeyPressed('2');
+      state.onKeyPressed('+');
+      state.onKeyPressed('2');
+      state.onKeyPressed('='); // Result 4, lastAns 0 -> result
+      state.onKeyPressed('3');
+      state.onKeyPressed('+');
+      state.onKeyPressed('3');
+      state.onKeyPressed('='); // Result 6, lastAns 4
+      state.onKeyPressed('CLR');
+      state.onKeyPressed('ALPHA');
+      state.onKeyPressed('Ans'); // PreAns label on Ans key
+      expect(state.currentExpression, '4.0');
+    });
+
+    test('CLRv clears variables', () {
+      state.onKeyPressed('ALPHA');
+      state.onKeyPressed('RCL'); // CLRv label on RCL key
+      // This calls _vars.updateAll to 0.0.
+      expect(state.currentExpression, '');
+    });
+
+    test('ALPHA + × inserts GCD', () {
+      state.onKeyPressed('ALPHA');
+      state.onKeyPressed('×');
+      expect(state.currentExpression, 'gcd(');
+    });
+  });
+
+  group('Default Output Mode (DECI/FRAC)', () {
+    test('toggleOutputMode changes isDefaultFractional', () {
+      expect(state.isDefaultFractional, false);
+      state.toggleOutputMode();
+      expect(state.isDefaultFractional, true);
+      state.toggleOutputMode();
+      expect(state.isDefaultFractional, false);
+    });
+
+    test('default mode affects result display', () {
+      // Set mode to FRAC (Fractional default)
+      state.toggleOutputMode();
+      expect(state.isDefaultFractional, true);
+
+      // Perform a calculation (1 ÷ 3)
+      state.onKeyPressed('1');
+      state.onKeyPressed('÷');
+      state.onKeyPressed('3');
+      state.onKeyPressed('=');
+
+      // isFractionDisplay should be true (matching isDefaultFractional)
+      expect(state.isFractionDisplay, true);
+
+      // Reset and set mode to DECI (Decimal default)
+      state.onKeyPressed('CLR');
+      state.toggleOutputMode();
+      expect(state.isDefaultFractional, false);
+
+      // Perform a calculation (1 ÷ 3)
+      state.onKeyPressed('1');
+      state.onKeyPressed('÷');
+      state.onKeyPressed('3');
+      state.onKeyPressed('=');
+
+      // isFractionDisplay should be false
+      expect(state.isFractionDisplay, false);
     });
   });
 }

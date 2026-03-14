@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_app/services/calculator_service.dart';
+import 'dart:math' as math;
 
 void main() {
   late CalculatorService service;
@@ -183,6 +184,99 @@ void main() {
 
     test('unknown function returns NaN', () {
       expect(service.calculate('xyz(5)').isNaN, true);
+    });
+  });
+
+  group('Variable x and Differentiation', () {
+    test('x variable evaluation', () {
+      expect(service.evaluate('x+5', vars: {'x': 2.0}), 7.0);
+    });
+
+    test('numerical differentiation d/dx(x²)', () {
+      // d/dx(x^2) at x=3 is 6
+      expect(service.calculate('diff(x^2,3)'), closeTo(6.0, 1e-5));
+    });
+
+    test('numerical differentiation d/dx(sin(x)) in Radians', () {
+      // d/dx(sin(x)) at x=0 (radians) is cos(0) = 1
+      service.angleUnit = AngleUnit.radian;
+      expect(service.calculate('diff(sin(x),0)'), closeTo(1.0, 1e-5));
+    });
+  });
+
+  group('Mode switching (Degree vs Radian)', () {
+    test('Trig in Degree mode', () {
+      service.angleUnit = AngleUnit.degree;
+      expect(service.calculate('sin(90)'), closeTo(1.0, 1e-10));
+    });
+
+    test('Trig in Radian mode', () {
+      service.angleUnit = AngleUnit.radian;
+      expect(service.calculate('sin(pi/2)'), closeTo(1.0, 1e-10));
+    });
+  });
+
+  group('ALPHA Functions and Multi-Variable Support', () {
+    test('gcd(12, 18)', () {
+      expect(service.calculate('gcd(12,18)'), 6.0);
+    });
+
+    test('lcm(12, 18)', () {
+      expect(service.calculate('lcm(12,18)'), 36.0);
+    });
+
+    test('ranInt(1, 10)', () {
+      final val = service.calculate('ranInt(1,10)');
+      expect(val >= 1 && val <= 10, true);
+    });
+
+    test('sum(x, 1, 5)', () {
+      // 1+2+3+4+5 = 15
+      expect(service.calculate('Σ(x,1,5)'), 15.0);
+    });
+
+    test('prod(x, 1, 4)', () {
+      // 1*2*3*4 = 24
+      expect(service.calculate('Π(x,1,4)'), 24.0);
+    });
+
+    test('avg(2, 4, 6)', () {
+      expect(service.calculate('avg(2,4,6)'), 4.0);
+    });
+
+    test('multi-variable evaluation', () {
+      expect(service.evaluate('a+b+c', vars: {'a': 1, 'b': 2, 'c': 3}), 6.0);
+    });
+  });
+
+  group('Settings-based Calculation Logic', () {
+    test('Implied Multiplication Type 1 (1/2π = 1/2*π)', () {
+      service.impliedMultiplication = ImpliedMultiplication.type1;
+      // 1 / 2 * pi = 0.5 * pi
+      expect(service.calculate('1/2π'), closeTo(math.pi / 2, 1e-10));
+    });
+
+    test('Implied Multiplication Type 2 (1/2π = 1/(2*π))', () {
+      service.impliedMultiplication = ImpliedMultiplication.type2;
+      // 1 / (2 * pi)
+      expect(service.calculate('1/2π'), closeTo(1 / (2 * math.pi), 1e-10));
+    });
+
+    test('Percentage Type 1 (100+20%=120)', () {
+      service.percentageType = PercentageType.type1;
+      expect(service.calculate('100+20%'), 120.0);
+      expect(service.calculate('100-20%'), 80.0);
+    });
+
+    test('Percentage Type 2 (100+20%=100.2)', () {
+      service.percentageType = PercentageType.type2;
+      expect(service.calculate('100+20%'), 100.2);
+    });
+
+    test('Gradian Mode', () {
+      service.angleUnit = AngleUnit.gradian;
+      // sin(100 grad) = sin(90 deg) = 1
+      expect(service.calculate('sin(100)'), closeTo(1.0, 1e-10));
     });
   });
 }

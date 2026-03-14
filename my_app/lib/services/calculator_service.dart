@@ -1,5 +1,9 @@
 import 'dart:math' as math;
 
+enum AngleUnit { degree, radian, gradian }
+enum ImpliedMultiplication { type1, type2 }
+enum PercentageType { type1, type2 }
+
 /// Recursive-descent expression parser and evaluator.
 ///
 /// Grammar (from lowest to highest precedence):
@@ -14,6 +18,7 @@ class CalculatorService {
   static const _star = 42; // '*'
   static const _slash = 47; // '/'
   static const _percent = 37; // '%'
+  static const _modulo = 126; // '~'
   static const _caret = 94; // '^'
   static const _bang = 33; // '!'
   static const _lparen = 40; // '('
@@ -26,11 +31,17 @@ class CalculatorService {
   static const _space = 32;
   static const _p = 80; // nPr
   static const _c = 67; // nCr
+  static const _A = 65; // 'A'
+  static const _Z = 90; // 'Z'
   static const _root = 8730; // '√'
 
   String _expr = '';
   int _pos = -1;
   int _ch = -1;
+  Map<String, double> _variables = {};
+  AngleUnit angleUnit = AngleUnit.degree;
+  ImpliedMultiplication impliedMultiplication = ImpliedMultiplication.type1;
+  PercentageType percentageType = PercentageType.type2;
 
   // ── Tokeniser helpers ────────────────────────────────────────────────
 
@@ -55,13 +66,32 @@ class CalculatorService {
     double x = _parseTerm();
     for (;;) {
       if (_eat(_plus)) {
-        x += _parseTerm();
+        double startPos = _pos.toDouble();
+        double term = _parseTerm();
+        if (percentageType == PercentageType.type1 && _isLastWasPercentage()) {
+          x += (x * term);
+        } else {
+          x += term;
+        }
       } else if (_eat(_minus)) {
-        x -= _parseTerm();
+        double term = _parseTerm();
+        if (percentageType == PercentageType.type1 && _isLastWasPercentage()) {
+          x -= (x * term);
+        } else {
+          x -= term;
+        }
       } else {
         return x;
       }
     }
+  }
+
+  bool _isLastWasPercentage() {
+    // Check if the character before current position (after parsing term) was '%'
+    // This is a bit of a hack but avoids changing the whole grammar to pass flags.
+    int p = _pos - 1;
+    while (p >= 0 && _expr.codeUnitAt(p) == _space) p--;
+    return p >= 0 && _expr.codeUnitAt(p) == _percent;
   }
 
   double _parseTerm() {
@@ -72,19 +102,29 @@ class CalculatorService {
       } else if (_eat(_slash)) {
         final divisor = _parseFactor();
         x = (divisor != 0) ? x / divisor : double.nan;
-      } else if (_eat(_percent)) {
+      } else if (_eat(_modulo)) {
         // Modulo
         x = x % _parseFactor();
       } else if (_eat(_p)) {
-        // nPr
         x = _nPr(x, _parseFactor());
       } else if (_eat(_c)) {
-        // nCr
         x = _nCr(x, _parseFactor());
+      } else if (impliedMultiplication == ImpliedMultiplication.type1 && _isNextAtom()) {
+        // Implied multiplication Type 1: Same precedence as * /
+        x *= _parseFactor();
       } else {
         return x;
       }
     }
+  }
+
+  bool _isNextAtom() {
+    while (_ch == _space) _nextChar();
+    return (_ch >= _zero && _ch <= _nine) || 
+           (_ch >= _a && _ch <= _z) || 
+           (_ch >= _A && _ch <= _Z) || 
+           (_ch == _lparen) || 
+           (_ch > 127);
   }
 
   double _parseFactor() {
@@ -105,9 +145,9 @@ class CalculatorService {
         _nextChar();
       }
       x = double.parse(_expr.substring(startPos, _pos));
-    } else if ((_ch >= _a && _ch <= _z) || _ch > 127) {
-      // Identifier (function name or constant) — lowercase + non-ASCII
-      while ((_ch >= _a && _ch <= _z) || _ch > 127) {
+    } else if ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch > 127) {
+      // Identifier (function name or constant) — [a-zA-Z] + non-ASCII
+      while ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch > 127) {
         _nextChar();
       }
       final name = _expr.substring(startPos, _pos);
@@ -118,9 +158,68 @@ class CalculatorService {
       } else if (name == 'e' && !_eat(_lparen)) {
         // lone 'e' without '(' is Euler's number
         x = math.e;
+      } else if (_variables.containsKey(name)) {
+        x = _variables[name]!;
       } else {
-        // ── Functions — parse argument ──
-        if (name != 'e') {
+        // ── Functions ──
+        if (name == 'diff') {
+          _eat(_lparen);
+          int start = _pos;
+          int parens = 0;
+          while (_ch != -1 && !(_ch == 44 && parens == 0)) {
+            if (_ch == _lparen) parens++;
+            if (_ch == _rparen) parens--;
+            _nextChar();
+          }
+          String subExpr = _expr.substring(start, _pos);
+          _eat(44);
+          double val = _parseExpression();
+          _eat(_rparen);
+
+          const h = 0.000001;
+          double y2 = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': val + h});
+          double y1 = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': val - h});
+          x = (y2 - y1) / (2 * h);
+        } else if (name == 'prod' || name == 'sum') {
+          _eat(_lparen);
+          int start = _pos;
+          int parens = 0;
+          while (_ch != -1 && !(_ch == 44 && parens == 0)) {
+            if (_ch == _lparen) parens++;
+            if (_ch == _rparen) parens--;
+            _nextChar();
+          }
+          String subExpr = _expr.substring(start, _pos);
+          _eat(44);
+          int startVal = _parseExpression().toInt();
+          _eat(44);
+          int endVal = _parseExpression().toInt();
+          _eat(_rparen);
+
+          x = (name == 'sum') ? 0 : 1;
+          for (int i = startVal; i <= endVal; i++) {
+            double temp = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': i.toDouble()});
+            if (name == 'sum') x += temp; else x *= temp;
+          }
+        } else if (name == 'gcd' || name == 'lcm' || name == 'ranInt') {
+          _eat(_lparen);
+          double a = _parseExpression();
+          _eat(44);
+          double b = _parseExpression();
+          _eat(_rparen);
+          if (name == 'gcd') x = _gcd(a.toInt(), b.toInt()).toDouble();
+          else if (name == 'lcm') x = _lcm(a.toInt(), b.toInt()).toDouble();
+          else x = (a.toInt() + math.Random().nextInt(b.toInt() - a.toInt() + 1)).toDouble();
+        } else if (name == 'avg') {
+          _eat(_lparen);
+          List<double> args = [];
+          args.add(_parseExpression());
+          while (_eat(44)) { // ','
+            args.add(_parseExpression());
+          }
+          _eat(_rparen);
+          x = args.isEmpty ? 0 : args.reduce((a, b) => a + b) / args.length;
+        } else if (name != 'e') {
           // normal function: expect '(' arg ')'
           if (!_eat(_lparen)) {
             // allow implicit argument (no parens)
@@ -129,13 +228,13 @@ class CalculatorService {
             x = _parseExpression();
             _eat(_rparen);
           }
+          x = _applyFunction(name, x);
         } else {
           // 'e' followed by '(' — we already consumed '(' above
           x = _parseExpression();
           _eat(_rparen);
+          x = _applyFunction(name, x);
         }
-
-        x = _applyFunction(name, x);
       }
     } else {
       return double.nan;
@@ -151,6 +250,16 @@ class CalculatorService {
       } else {
         x = math.pow(radicand, 1 / x).toDouble();
       }
+    }
+
+    // Implied multiplication Type 2: Higher precedence
+    if (impliedMultiplication == ImpliedMultiplication.type2 && _isNextAtom()) {
+      x *= _parseFactor();
+    }
+
+    // Percentage postfix (Note: different from modulo which is infix in _parseTerm)
+    if (_eat(_percent)) {
+      x /= 100.0;
     }
 
     return x;
@@ -175,23 +284,23 @@ class CalculatorService {
 
       // Trigonometric (input in degrees)
       case 'sin':
-        return math.sin(_toRadians(x));
+        return math.sin(_maybeToRadians(x));
       case 'cos':
-        return math.cos(_toRadians(x));
+        return math.cos(_maybeToRadians(x));
       case 'tan':
-        return math.tan(_toRadians(x));
+        return math.tan(_maybeToRadians(x));
       case 'cot':
-        return 1 / math.tan(_toRadians(x));
+        return 1 / math.tan(_maybeToRadians(x));
 
-      // Inverse trigonometric (output in degrees)
+      // Inverse trigonometric (output in degrees if degree mode)
       case 'asin':
-        return _toDegrees(math.asin(x));
+        return _maybeFromRadians(math.asin(x));
       case 'acos':
-        return _toDegrees(math.acos(x));
+        return _maybeFromRadians(math.acos(x));
       case 'atan':
-        return _toDegrees(math.atan(x));
+        return _maybeFromRadians(math.atan(x));
       case 'acot':
-        return _toDegrees(math.atan(1 / x));
+        return _maybeFromRadians(math.atan(1 / x));
 
       // Hyperbolic
       case 'sinh':
@@ -228,6 +337,22 @@ class CalculatorService {
 
   // ── Maths helpers ────────────────────────────────────────────────────
 
+  double _maybeToRadians(double val) {
+    switch (angleUnit) {
+      case AngleUnit.degree: return val * math.pi / 180.0;
+      case AngleUnit.gradian: return val * math.pi / 200.0;
+      case AngleUnit.radian: return val;
+    }
+  }
+
+  double _maybeFromRadians(double rad) {
+    switch (angleUnit) {
+      case AngleUnit.degree: return rad * 180.0 / math.pi;
+      case AngleUnit.gradian: return rad * 200.0 / math.pi;
+      case AngleUnit.radian: return rad;
+    }
+  }
+
   double _toRadians(double deg) => deg * math.pi / 180.0;
   double _toDegrees(double rad) => rad * 180.0 / math.pi;
 
@@ -255,26 +380,44 @@ class CalculatorService {
     return _factorial(n) / (_factorial(r) * _factorial(n - r));
   }
 
+  int _gcd(int a, int b) {
+    while (b != 0) {
+      int t = b;
+      b = a % b;
+      a = t;
+    }
+    return a;
+  }
+
+  int _lcm(int a, int b) => (a * b) ~/ _gcd(a, b);
+
   // ── Public API ───────────────────────────────────────────────────────
 
-  /// Evaluate a UI expression string (with Unicode operators) and return
-  /// the numeric result. Returns [double.nan] on any error.
   double calculate(String uiExpression) {
-    if (uiExpression.isEmpty) return 0.0;
+    return evaluate(uiExpression);
+  }
 
-    final mathString = uiExpression
+  /// Internal evaluation engine.
+  double evaluate(String expression, {Map<String, double> vars = const {}}) {
+    if (expression.isEmpty) return 0.0;
+
+    final mathString = expression
         .replaceAll('×', '*')
         .replaceAll('÷', '/')
-        .replaceAll('mod', '%')
+        .replaceAll('mod', '~')
         .replaceAll('π', 'pi')
         .replaceAll('²', '^2')
         .replaceAll('³', '^3')
         .replaceAll('ⁿ', '^')
         .replaceAll('∛', 'cbrt')
+        .replaceAll('⁻¹', '^-1')
+        .replaceAll('Σ', 'sum')
+        .replaceAll('Π', 'prod')
         .replaceAll(' ', '');
 
     _expr = mathString;
     _pos = -1;
+    _variables = Map.from(vars);
     _nextChar();
 
     try {

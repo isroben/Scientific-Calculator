@@ -4,6 +4,8 @@ import '../widgets/calc_button.dart';
 import '../data/keypad_layout.dart';
 import '../models/calc_key.dart';
 import '../services/calculator_state.dart';
+import '../services/calculator_service.dart';
+import 'settings_screen.dart';
 import 'dart:async';
 
 class CalculatorScreen extends StatefulWidget {
@@ -376,10 +378,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             const SizedBox(width: 10),
             _buildGoProButton(),
             const SizedBox(width: 10),
-            const Icon(
-              Icons.settings_outlined,
-              color: Colors.white,
-              size: 22,
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SettingsScreen(state: _state),
+                  ),
+                ).then((_) => setState(() {}));
+              },
+              child: const Icon(
+                Icons.settings_outlined,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 16),
             const Text(
@@ -390,10 +402,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(width: 16),
-            const Text(
-              'RAD',
-              style: TextStyle(color: Colors.white, fontSize: 18),
+             const SizedBox(width: 16),
+            Text(
+              _state.angleUnit == AngleUnit.degree ? 'DEG' : 
+              _state.angleUnit == AngleUnit.radian ? 'RAD' : 'GRA',
+              style: const TextStyle(color: Colors.white, fontSize: 18),
             ),
             const SizedBox(width: 16),
             const Text(
@@ -401,9 +414,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               style: TextStyle(color: Colors.white, fontSize: 18),
             ),
             const SizedBox(width: 16),
-            const Text(
-              'DECI',
-              style: TextStyle(color: Colors.white, fontSize: 18),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _state.toggleOutputMode();
+                });
+              },
+              child: Text(
+                _state.isDefaultFractional ? 'FRAC' : 'DECI',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+              ),
             ),
           ],
         ),

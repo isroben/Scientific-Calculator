@@ -24,6 +24,17 @@ class CalculatorState extends ChangeNotifier {
   bool get showCursor => _showCursor;
   bool get shift => _shift;
   bool get alpha => _alpha;
+  AngleUnit get angleUnit => _service.angleUnit;
+  ImpliedMultiplication get impliedMultiplication => _impliedMultiplication;
+  PercentageType get percentageType => _percentageType;
+  bool get casMode => _casMode;
+  bool get autoCalculate => _autoCalculate;
+  bool get autoCalculateDMS => _autoCalculateDMS;
+  bool get frequencyColumn => _frequencyColumn;
+  bool get useGXFunction => _useGXFunction;
+  bool get ignoreExtraOperators => _ignoreExtraOperators;
+  bool get autoCalculateIntegral => _autoCalculateIntegral;
+  bool get isDefaultFractional => _isDefaultFractional;
   bool get isFractionDisplay => _isFractionDisplay;
   String? get currentFraction => _currentFraction;
 
@@ -47,6 +58,23 @@ class CalculatorState extends ChangeNotifier {
   bool _alpha = false;
   double _memory = 0.0;
   double _lastAnswer = 0.0;
+  double _preAns = 0.0;
+  final Map<String, double> _vars = {
+    'a': 0, 'b': 0, 'c': 0, 'd': 0, 'e': 0, 'f': 0, 'm': 0, 'x': 0, 'y': 0, 't': 0
+  };
+  
+  // Settings
+  ImpliedMultiplication _impliedMultiplication = ImpliedMultiplication.type1;
+  PercentageType _percentageType = PercentageType.type2;
+  bool _casMode = true;
+  bool _autoCalculate = true;
+  bool _autoCalculateDMS = true;
+  bool _frequencyColumn = true;
+  bool _useGXFunction = true;
+  bool _ignoreExtraOperators = true;
+  bool _autoCalculateIntegral = false;
+  bool _isDefaultFractional = false;
+
   bool _isFractionDisplay = true;
   String? _currentFraction;
   int _cursorPosition = 0;
@@ -83,6 +111,15 @@ class CalculatorState extends ChangeNotifier {
     'Floor': 'floor',
     'nPr': 'nPr',
     'nCr': 'nCr',
+    'Σ': 'sum',
+    'Π': 'prod',
+    '∠': 'angle',
+    'Pol': 'pol',
+    'Rec': 'rec',
+    'GCD': 'gcd',
+    'LCM': 'lcm',
+    'RanInt': 'ranInt',
+    'avg': 'avg',
   };
 
   static const _operators = {'+', '-', '×', '÷', '^', 'mod'};
@@ -106,6 +143,78 @@ class CalculatorState extends ChangeNotifier {
 
   void toggleCursor() {
     _showCursor = !_showCursor;
+    notifyListeners();
+  }
+
+  void toggleOutputMode() {
+    _isDefaultFractional = !_isDefaultFractional;
+    notifyListeners();
+  }
+
+  void setAngleUnit(AngleUnit unit) {
+    _service.angleUnit = unit;
+    notifyListeners();
+  }
+
+  void setImpliedMultiplication(ImpliedMultiplication mode) {
+    _impliedMultiplication = mode;
+    _service.impliedMultiplication = mode;
+    notifyListeners();
+  }
+
+  void setPercentageType(PercentageType type) {
+    _percentageType = type;
+    _service.percentageType = type;
+    notifyListeners();
+  }
+
+  void setCasMode(bool value) {
+    _casMode = value;
+    notifyListeners();
+  }
+
+  void setAutoCalculate(bool value) {
+    _autoCalculate = value;
+    notifyListeners();
+  }
+
+  void setAutoCalculateDMS(bool value) {
+    _autoCalculateDMS = value;
+    notifyListeners();
+  }
+
+  void setFrequencyColumn(bool value) {
+    _frequencyColumn = value;
+    notifyListeners();
+  }
+
+  void setUseGXFunction(bool value) {
+    _useGXFunction = value;
+    notifyListeners();
+  }
+
+  void setIgnoreExtraOperators(bool value) {
+    _ignoreExtraOperators = value;
+    notifyListeners();
+  }
+
+  void setAutoCalculateIntegral(bool value) {
+    _autoCalculateIntegral = value;
+    notifyListeners();
+  }
+
+  void resetSettings() {
+    _service.angleUnit = AngleUnit.degree;
+    _impliedMultiplication = ImpliedMultiplication.type1;
+    _percentageType = PercentageType.type2;
+    _casMode = true;
+    _autoCalculate = true;
+    _autoCalculateDMS = true;
+    _frequencyColumn = true;
+    _useGXFunction = true;
+    _ignoreExtraOperators = true;
+    _autoCalculateIntegral = false;
+    _isDefaultFractional = false;
     notifyListeners();
   }
 
@@ -184,6 +293,7 @@ class CalculatorState extends ChangeNotifier {
         actualLabel != 'CLR All' &&
         actualLabel != 'AC' &&
         actualLabel != 'S⇔D' &&
+        actualLabel != 'CLRv' &&
         !_isMemoryOp(actualLabel)) {
       history.add(Calculation(_currentExpression, _currentResult));
       _clearExpression();
@@ -227,6 +337,13 @@ class CalculatorState extends ChangeNotifier {
       return;
     }
 
+    // Mode toggle (Cycles through DEG, RAD, GRA)
+    if (label == 'MODE') {
+      final nextUnit = AngleUnit.values[(_service.angleUnit.index + 1) % AngleUnit.values.length];
+      _service.angleUnit = nextUnit;
+      return;
+    }
+
     // Backspace — delete character before cursor
     if (label == '⌫') {
       if (_isShowingResult) {
@@ -258,6 +375,12 @@ class CalculatorState extends ChangeNotifier {
       return;
     }
 
+    // PreAns
+    if (label == 'PreAns') {
+      _insertAtCursor('$_preAns');
+      return;
+    }
+
     // Exponents
     if (label == 'x²') {
       _insertAtCursor('²');
@@ -267,8 +390,22 @@ class CalculatorState extends ChangeNotifier {
       _insertAtCursor('³');
       return;
     }
+    if (label == 'x⁻¹') {
+      _insertAtCursor('⁻¹');
+      return;
+    }
+    if (label == '■!') {
+      _insertAtCursor('!');
+      return;
+    }
     if (label == 'xⁿ') {
       _insertAtCursor('^');
+      return;
+    }
+
+    // d/dx
+    if (label == 'd/dx') {
+      _insertAtCursor('diff(');
       return;
     }
 
@@ -308,6 +445,12 @@ class CalculatorState extends ChangeNotifier {
       return;
     }
 
+    // CLRv (Clear Variables)
+    if (label == 'CLRv') {
+      _vars.updateAll((key, value) => 0.0);
+      return;
+    }
+
     // Parentheses
     if (label == '(' || label == ')') {
       _insertAtCursor(label);
@@ -318,6 +461,15 @@ class CalculatorState extends ChangeNotifier {
     if (label == 'ⁿ√x') {
       _insertAtCursor('√(');
       _cursorPosition -= 2;
+      return;
+    }
+
+    if (label == 'x̅') {
+      _insertAtCursor('avg(');
+      return;
+    }
+    if (label == '%' || label == ',' || label == ':') {
+      _insertAtCursor(label);
       return;
     }
 
@@ -337,7 +489,11 @@ class CalculatorState extends ChangeNotifier {
   void _evaluate() {
     if (_currentExpression.isEmpty || _isShowingResult) return;
     try {
-      final result = _service.calculate(_currentExpression);
+      _service.angleUnit = angleUnit;
+      _service.impliedMultiplication = _impliedMultiplication;
+      _service.percentageType = _percentageType;
+      
+      final result = _service.evaluate(_currentExpression, vars: _vars);
       if (result.isNaN) {
         _currentResult = 'Error';
       } else {
@@ -349,11 +505,12 @@ class CalculatorState extends ChangeNotifier {
           text = text.replaceAll(RegExp(r'0+$'), '');
           text = text.replaceAll(RegExp(r'\.$'), '');
         }
+        _preAns = _lastAnswer;
         _currentResult = text;
         _lastAnswer = rounded;
         _isShowingResult = true;
         _currentFraction = _toFraction(text);
-        _isFractionDisplay = true;
+        _isFractionDisplay = _isDefaultFractional;
       }
     } catch (_) {
       _currentResult = 'Error';
@@ -374,6 +531,9 @@ class CalculatorState extends ChangeNotifier {
     }
     switch (op) {
       case 'STO':
+        // For simplicity, store to M or current variable context if we had one.
+        // On a Casio, STO is followed by a variable key.
+        // Here we'll just store to memory.
         _memory = value;
       case 'RCL':
         _insertAtCursor('$_memory');
