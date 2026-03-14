@@ -6,7 +6,11 @@ import '../models/calc_key.dart';
 import '../services/calculator_state.dart';
 import '../services/calculator_service.dart';
 import 'settings_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import '../services/scanner/scanner_service.dart';
+import '../services/ai_api_service.dart';
+import '../services/global_state.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -16,9 +20,12 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  final CalculatorState _state = CalculatorState();
+  final CalculatorState _state = globalCalculatorState;
   late Timer _cursorTimer;
   final ScrollController _scrollController = ScrollController();
+  final ScannerService _scannerService = ScannerService();
+  final AiApiService _aiApiService = AiApiService();
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -27,7 +34,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     // Listen to all state changes (including cursor blink) to rebuild UI
     _state.addListener(_onStateChanged);
     _cursorTimer = Timer.periodic(const Duration(milliseconds: 300), (_) {
-      if (mounted) _state.toggleCursor();
+      if (mounted && _state.blinkCursorMode) {
+        _state.toggleCursor();
+      } else if (mounted && !_state.blinkCursorMode) {
+        // If blink is disabled, ensure cursor is showing when not in result mode
+        if (!_state.showCursor) _state.toggleCursor();
+      }
     });
   }
 
@@ -40,7 +52,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     _cursorTimer.cancel();
     _scrollController.dispose();
     _state.removeListener(_onStateChanged);
-    _state.dispose();
+    // Don't dispose global state
+    _scannerService.dispose();
     super.dispose();
   }
 
@@ -69,14 +82,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       flex: isDense ? 8 : 9,
       child: Row(
         children: keys.map((key) {
+          final effectiveLabel = key.label == '÷' ? _state.divisionSign : 
+                               (key.label == '×' ? _state.multiplicationSign : key.label);
           return CalcButton(
-            label: key.label,
+            label: effectiveLabel,
             top: key.top,
             right: key.right,
             color: key.color,
             textColor: key.textColor,
             onTap: () => _onPressed(key.label),
-            fontSize: isDense ? 20 : 28,
+            fontSize: (isDense ? 20 : 28) * _state.keyboardFontSizeScaling,
             fontWeight: isDense ? FontWeight.normal : FontWeight.bold,
             verticalPadding: isDense ? 0.2 : 1.0,
             horizontalPadding: 3.5,
@@ -102,24 +117,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
           child: Stack(
             children: [
-              const Positioned(
-                top: 4,
-                right: 4,
-                child: Icon(
-                  Icons.camera_alt_outlined,
-                  size: 22,
-                  color: CalcColors.textDark,
-                ),
-              ),
+              // Removed top right camera icon as requested to move it
               Positioned(
-                bottom: 10,
-                left: 10,
-                child: Row(
-                  children: [
-                    _iconBox(Icons.crop_free),
-                    const SizedBox(width: 4),
-                    _iconBox(Icons.more_horiz),
-                  ],
+                bottom: 12,
+                left: 12,
+                child: _iconBox(
+                  Icons.camera_alt, 
+                  size: 24,
+                  onTap: _isScanning ? null : _handleCameraScan,
                 ),
               ),
               Padding(
@@ -129,6 +134,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   itemCount: _state.history.length + 1,
                   padding: const EdgeInsets.only(bottom: 40),
                   itemBuilder: (context, index) {
+                    if (_isScanning) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(color: Color(0xFF5AB9EA)),
+                        ),
+                      );
+                    }
                     if (index < _state.history.length) {
                       return _buildHistoryItem(index);
                     }
@@ -151,10 +164,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       children: [
         RichText(
           text: TextSpan(
-            style: const TextStyle(
-              fontSize: 28,
+            style: GoogleFonts.getFont(_state.displayFontFamily,
+              fontSize: _state.displayFontSize,
               color: CalcColors.textDark,
-              fontFamily: 'monospace',
               height: 1.0,
             ),
             children: _buildExpressionSpans(calc.expression, '', false, false),
@@ -163,10 +175,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         Text(
           formatDecimal(calc.result),
           textAlign: TextAlign.right,
-          style: const TextStyle(
-            fontSize: 28,
+          style: GoogleFonts.getFont(
+            _state.displayFontFamily,
+            fontSize: _state.displayFontSize,
             color: CalcColors.textDark,
-            fontFamily: 'monospace',
             height: 1.0,
           ),
         ),
@@ -191,23 +203,37 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       children: [
         RichText(
           text: TextSpan(
-            style: const TextStyle(
-              fontSize: 28,
+            style: GoogleFonts.getFont(_state.displayFontFamily,
+              fontSize: _state.displayFontSize,
               color: CalcColors.textDark,
-              fontFamily: 'monospace',
               height: 1.0,
             ),
-            children: _buildExpressionSpans(beforeCursor, afterCursor, _state.showCursor && !_state.isShowingResult, false),
+            children: _buildExpressionSpans(beforeCursor, afterCursor, _state.showCursor && !_state.isShowingResult && !_state.isAiProcessing, false),
           ),
         ),
-        if (_state.currentResult.isNotEmpty)
+        if (_state.isAiProcessing)
+          const Padding(
+            padding: EdgeInsets.only(top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: CalcColors.textDark),
+                ),
+                SizedBox(width: 8),
+                Text('AI Solving...', style: TextStyle(color: CalcColors.textDark, fontSize: 14)),
+              ],
+            ),
+          )
+        else if (_state.currentResult.isNotEmpty)
           Text(
             resultText,
             textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontSize: 28,
+            style: GoogleFonts.getFont(_state.displayFontFamily,
+              fontSize: _state.displayFontSize,
               color: CalcColors.textDark,
-              fontFamily: 'monospace',
               height: 1.0,
             ),
           ),
@@ -220,9 +246,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final text = '$before\u200B$after';
 
     bool inExponent = false;
+    bool inSubscript = false;
     int parenDepth = 0;
+    int subscriptParenDepth = 0;
     StringBuffer currentNormal = StringBuffer();
     StringBuffer currentSuperscript = StringBuffer();
+    StringBuffer currentSubscript = StringBuffer();
 
     void flushNormal() {
       if (currentNormal.isNotEmpty) {
@@ -237,18 +266,61 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           alignment: PlaceholderAlignment.top,
           child: Padding(
             padding: const EdgeInsets.only(top: 2.0),
-            child: Text(
-              currentSuperscript.toString(),
-              style: const TextStyle(
-                fontSize: 16,
-                color: CalcColors.textDark,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
+              child: Text(
+                currentSuperscript.toString(),
+                style: GoogleFonts.getFont(
+                  _state.displayFontFamily,
+                  fontSize: _state.displayFontSize * 0.6,
+                  color: CalcColors.textDark,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
           ),
         ));
         currentSuperscript.clear();
+      }
+    }
+
+    void flushSubscript() {
+      if (currentSubscript.isNotEmpty) {
+        String disp = currentSubscript.toString();
+        // Remove zero-width characters for empty content check
+        String cleanDisp = disp.replaceAll('\u200B', '');
+
+        if (cleanDisp == '()') {
+          spans.add(WidgetSpan(
+            alignment: PlaceholderAlignment.bottom,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 2.0),
+              child: Text(
+                '(□)',
+                style: GoogleFonts.getFont(
+                  _state.displayFontFamily,
+                  fontSize: _state.displayFontSize * 0.45,
+                  color: Colors.black26,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ));
+        } else {
+          spans.add(WidgetSpan(
+            alignment: PlaceholderAlignment.bottom,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 2.0),
+                child: Text(
+                  disp,
+                  style: GoogleFonts.getFont(
+                    _state.displayFontFamily,
+                    fontSize: _state.displayFontSize * 0.55,
+                    color: CalcColors.textDark,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ),
+          ));
+        }
+        currentSubscript.clear();
       }
     }
 
@@ -258,16 +330,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       if (char == '\u200B') {
         flushNormal();
         flushSuperscript();
+        flushSubscript();
         if (!isResultText) {
           spans.add(WidgetSpan(
-            alignment: inExponent ? PlaceholderAlignment.top : PlaceholderAlignment.middle,
+            alignment: inExponent ? PlaceholderAlignment.top : (inSubscript ? PlaceholderAlignment.bottom : PlaceholderAlignment.middle),
             child: Opacity(
               opacity: showCursor ? 1.0 : 0.0,
               child: Container(
                 width: 2.5, 
-                height: inExponent ? 16 : 28, 
+                height: (inExponent || inSubscript) ? 16 : 28, 
                 color: CalcColors.cursor,
-                margin: inExponent ? const EdgeInsets.only(top: 2.0) : EdgeInsets.zero,
+                margin: inExponent ? const EdgeInsets.only(top: 2.0) : (inSubscript ? const EdgeInsets.only(bottom: 2.0) : EdgeInsets.zero),
               ),
             ),
           ));
@@ -284,12 +357,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             padding: const EdgeInsets.only(top: 2.0),
             child: Text(
               char == '²' ? '2' : '3',
-              style: const TextStyle(
-                fontSize: 16,
-                color: CalcColors.textDark,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
-              ),
+                style: GoogleFonts.getFont(
+                  _state.displayFontFamily,
+                  fontSize: _state.displayFontSize * 0.6,
+                  color: CalcColors.textDark,
+                  fontWeight: FontWeight.bold,
+                ),
             ),
           ),
         ));
@@ -314,18 +387,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         }
 
         if (isEmptyExponent) {
-          spans.add(const WidgetSpan(
+          spans.add(WidgetSpan(
             alignment: PlaceholderAlignment.top,
             child: Padding(
-              padding: EdgeInsets.only(top: 2.0),
+              padding: const EdgeInsets.only(top: 2.0),
               child: Text(
                 '□',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black38,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
+                  style: GoogleFonts.getFont(
+                    _state.displayFontFamily,
+                    fontSize: _state.displayFontSize * 0.6,
+                    color: Colors.black38,
+                    fontWeight: FontWeight.bold,
+                  ),
               ),
             ),
           ));
@@ -354,13 +427,59 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           inExponent = false;
           currentNormal.write(char);
         }
+      } else if (inSubscript) {
+        if (char == '(') {
+          subscriptParenDepth++;
+          currentSubscript.write(char);
+        } else if (char == ')') {
+          subscriptParenDepth--;
+          if (subscriptParenDepth <= 0) {
+            currentSubscript.write(char);
+            flushSubscript();
+            inSubscript = false;
+            subscriptParenDepth = 0;
+          } else {
+            currentSubscript.write(char);
+          }
+        } else {
+          currentSubscript.write(char);
+        }
       } else {
+        // Lookahead for log_(base)
+        if (char == 'l' && text.substring(i).startsWith('log_(')) {
+          int firstOpen = i + 4;
+          int depth = 0;
+          int firstClose = -1;
+          for (int j = firstOpen; j < text.length; j++) {
+            if (text[j] == '\u200B') continue;
+            if (text[j] == '(') depth++;
+            if (text[j] == ')') {
+              depth--;
+              if (depth == 0) {
+                firstClose = j;
+                break;
+              }
+            }
+          }
+
+          if (firstClose != -1) {
+            flushNormal();
+            spans.add(const TextSpan(text: 'log'));
+            i = firstOpen; // Now at '('
+            
+            inSubscript = true;
+            subscriptParenDepth = 1;
+            currentSubscript.write('(');
+            continue;
+          }
+        }
         currentNormal.write(char);
       }
     }
 
     flushNormal();
     flushSuperscript();
+    flushSubscript();
 
     return spans;
   }
@@ -458,14 +577,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   // ── Small widgets ────────────────────────────────────────────────────
 
-  Widget _iconBox(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        border: Border.all(color: CalcColors.textDark, width: 1.5),
-        borderRadius: BorderRadius.circular(4),
+  Widget _iconBox(IconData icon, {double size = 16, VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, size: size, color: CalcColors.textDark),
       ),
-      child: Icon(icon, size: 16, color: CalcColors.textDark),
     );
   }
 
@@ -514,5 +636,37 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleCameraScan() async {
+    setState(() => _isScanning = true);
+    
+    try {
+      final String? jsonPayload = await _scannerService.scanMathProblem();
+      
+      if (jsonPayload != null) {
+        // Feed the structured JSON to our AI model endpoint
+        await _aiApiService.feedToAiModel(jsonPayload);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Problem scanned and fed to AI!'),
+              backgroundColor: Color(0xFF5AB9EA),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scanning failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+    }
   }
 }

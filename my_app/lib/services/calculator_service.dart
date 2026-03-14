@@ -145,21 +145,28 @@ class CalculatorService {
         _nextChar();
       }
       x = double.parse(_expr.substring(startPos, _pos));
-    } else if ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch > 127) {
-      // Identifier (function name or constant) — [a-zA-Z] + non-ASCII
-      while ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch > 127) {
+    } else if ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch == 95 || _ch > 127) {
+      // Identifier (function name or constant)
+      while ((_ch >= _a && _ch <= _z) || (_ch >= _A && _ch <= _Z) || _ch == 95 || _ch > 127) {
         _nextChar();
       }
-      final name = _expr.substring(startPos, _pos);
+      final name = _expr.substring(startPos, _pos).toLowerCase();
 
-      // ── Constants (no parentheses needed) ──
+      // ── Constants & Variables (no parentheses needed) ──
       if (name == 'π' || name == 'pi') {
         x = math.pi;
       } else if (name == 'e' && !_eat(_lparen)) {
-        // lone 'e' without '(' is Euler's number
         x = math.e;
+      } else if (name == 'log_') {
+        _eat(_lparen);
+        double base = _parseExpression();
+        _eat(_rparen);
+        double arg = _parseFactor(); // Argument is the next factor
+        x = math.log(arg) / math.log(base);
       } else if (_variables.containsKey(name)) {
         x = _variables[name]!;
+      } else if (name == 'x') {
+        x = _variables['x'] ?? 0.0;
       } else {
         // ── Functions ──
         if (name == 'diff') {
@@ -172,7 +179,7 @@ class CalculatorService {
             _nextChar();
           }
           String subExpr = _expr.substring(start, _pos);
-          _eat(44);
+          _eat(44); // ','
           double val = _parseExpression();
           _eat(_rparen);
 
@@ -180,6 +187,22 @@ class CalculatorService {
           double y2 = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': val + h});
           double y1 = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': val - h});
           x = (y2 - y1) / (2 * h);
+        } else if (name == 'integral') {
+          _eat(_lparen);
+          int start = _pos;
+          int parens = 0;
+          while (_ch != -1 && !(_ch == 44 && parens == 0)) {
+            if (_ch == _lparen) parens++;
+            if (_ch == _rparen) parens--;
+            _nextChar();
+          }
+          String subExpr = _expr.substring(start, _pos);
+          _eat(44); // ','
+          double lower = _parseExpression();
+          _eat(44); // ','
+          double upper = _parseExpression();
+          _eat(_rparen);
+          x = _integral(subExpr, lower, upper);
         } else if (name == 'prod' || name == 'sum') {
           _eat(_lparen);
           int start = _pos;
@@ -201,7 +224,7 @@ class CalculatorService {
             double temp = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(subExpr, vars: {..._variables, 'x': i.toDouble()});
             if (name == 'sum') x += temp; else x *= temp;
           }
-        } else if (name == 'gcd' || name == 'lcm' || name == 'ranInt') {
+        } else if (name == 'gcd' || name == 'lcm' || name == 'ranint') {
           _eat(_lparen);
           double a = _parseExpression();
           _eat(44);
@@ -221,19 +244,24 @@ class CalculatorService {
           x = args.isEmpty ? 0 : args.reduce((a, b) => a + b) / args.length;
         } else if (name != 'e') {
           // normal function: expect '(' arg ')'
-          if (!_eat(_lparen)) {
-            // allow implicit argument (no parens)
-            x = _parseFactor();
-          } else {
+          if (_eat(_lparen)) {
             x = _parseExpression();
             _eat(_rparen);
+            x = _applyFunction(name, x);
+          } else {
+            // allow implicit argument (no parens)
+            x = _parseFactor();
+            x = _applyFunction(name, x);
           }
-          x = _applyFunction(name, x);
         } else {
-          // 'e' followed by '(' — we already consumed '(' above
-          x = _parseExpression();
-          _eat(_rparen);
-          x = _applyFunction(name, x);
+          // 'e' followed by '('
+          if (_eat(_lparen)) {
+            x = _parseExpression();
+            _eat(_rparen);
+            x = _applyFunction(name, x);
+          } else {
+            x = math.e;
+          }
         }
       }
     } else {
@@ -391,6 +419,26 @@ class CalculatorService {
 
   int _lcm(int a, int b) => (a * b) ~/ _gcd(a, b);
 
+  double _integral(String expr, double a, double b) {
+    const n = 1000; // Number of steps (should be even)
+    double h = (b - a) / n;
+    
+    double sum = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(expr, vars: {..._variables, 'x': a}) +
+                 (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(expr, vars: {..._variables, 'x': b});
+
+    for (int i = 1; i < n; i++) {
+      double x = a + i * h;
+      double val = (CalculatorService()..angleUnit = angleUnit..impliedMultiplication = impliedMultiplication..percentageType = percentageType).evaluate(expr, vars: {..._variables, 'x': x});
+      if (i % 2 == 0) {
+        sum += 2 * val;
+      } else {
+        sum += 4 * val;
+      }
+    }
+
+    return (h / 3) * sum;
+  }
+
   // ── Public API ───────────────────────────────────────────────────────
 
   double calculate(String uiExpression) {
@@ -413,6 +461,10 @@ class CalculatorService {
         .replaceAll('⁻¹', '^-1')
         .replaceAll('Σ', 'sum')
         .replaceAll('Π', 'prod')
+        .replaceAll('∫d', 'integral')
+        .replaceAll('∫', 'integral')
+        .replaceAll('d/dx', 'diff')
+        .replaceAllMapped(RegExp(r'd\((.*?)\)/dx'), (match) => 'diff(${match.group(1)})')
         .replaceAll(' ', '');
 
     _expr = mathString;
